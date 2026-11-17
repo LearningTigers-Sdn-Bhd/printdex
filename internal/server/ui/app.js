@@ -21,7 +21,7 @@
   function syncThemeButtons(mode) {
     mode = mode || currentTheme();
     document.querySelectorAll(".theme-switch button").forEach((b) => {
-      b.classList.toggle("active", b.dataset.themeVal === mode);
+      b.setAttribute("aria-pressed", String(b.dataset.themeVal === mode));
     });
   }
 
@@ -34,49 +34,70 @@
   syncThemeButtons();
 
   // ================= Settings drawer =================
-  const DRAWER_KEY = "ep-drawer-manual"; // reused pattern key prefix below
-  let _drawerLastFocus = null;
+  function showSettings(section) {
+    document.querySelectorAll("[data-settings-panel]").forEach((panel) => {
+      panel.hidden = panel.dataset.settingsPanel !== section;
+    });
+    document.querySelectorAll("[data-settings-tab]").forEach((button) => {
+      const selected = button.dataset.settingsTab === section;
+      button.setAttribute("aria-selected", String(selected));
+      button.tabIndex = selected ? 0 : -1;
+    });
+    document.querySelector(".drawer-body").scrollTop = 0;
+  }
 
-  function openDrawer(sectionId) {
-    const prev = document.activeElement;
-    _drawerLastFocus = (prev && prev !== document.body && prev !== $("drawer")) ? prev : $("settings-btn");
-    $("scrim").classList.add("open");
-    $("drawer").classList.add("open");
-    document.addEventListener("keydown", _drawerKeydown, true);
-    $("drawer").focus();
-    if (sectionId) {
-      const target = $(sectionId === "event" ? "drawer-event" : sectionId);
-      if (target) setTimeout(() => target.scrollIntoView({ block: "start" }), 60);
+  $("settings-nav").addEventListener("keydown", (event) => {
+    const tabs = Array.from(event.currentTarget.querySelectorAll('[role="tab"]'));
+    const current = tabs.indexOf(event.target);
+    let next;
+    switch (event.key) {
+      case "ArrowLeft": next = (current + tabs.length - 1) % tabs.length; break;
+      case "ArrowRight": next = (current + 1) % tabs.length; break;
+      case "Home": next = 0; break;
+      case "End": next = tabs.length - 1; break;
+      default: return;
     }
+    event.preventDefault();
+    tabs[next].click();
+    tabs[next].focus();
+  });
+
+  function openDrawer(section = "event") {
+    const editing = section === "layout";
+    const drawer = $("drawer");
+    drawer.classList.toggle("layout-editor", editing);
+    $("settings-title").textContent = editing ? "Badge layout" : "Settings";
+    $("settings-nav").hidden = editing;
+    $("settings-preview").hidden = !editing;
+    showSettings(section);
+    if (editing) $("settings-preview").append($("badge-preview"));
+    drawer.showModal();
   }
 
   function closeDrawer() {
-    $("scrim").classList.remove("open");
-    $("drawer").classList.remove("open");
-    document.removeEventListener("keydown", _drawerKeydown, true);
-    const back = _drawerLastFocus && document.contains(_drawerLastFocus) ? _drawerLastFocus : $("settings-btn");
-    _drawerLastFocus = null;
-    // Scan mode: the next thing staff do is scan, not tab around the page.
-    if (scannerActive()) focusScan(); else if (back) back.focus();
+    const drawer = $("drawer");
+    if (!drawer.open || drawer.classList.contains("closing")) return;
+    drawer.classList.add("closing");
+    const slide = drawer.getAnimations?.().find((animation) => animation.animationName === "sheet-out");
+    const finish = () => {
+      drawer.close();
+      drawer.classList.remove("closing");
+    };
+    if (slide) slide.finished.then(finish, finish);
+    else finish();
   }
 
-  function _drawerKeydown(e) {
-    if (e.key === "Escape") { e.preventDefault(); closeDrawer(); return; }
-    if (e.key !== "Tab") return;
-    const drawer = $("drawer");
-    const focusables = drawer.querySelectorAll(
-      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    );
-    if (!focusables.length) return;
-    const first = focusables[0];
-    const last = focusables[focusables.length - 1];
-    const active = document.activeElement;
-    if (e.shiftKey && (active === first || active === drawer)) {
-      e.preventDefault(); last.focus();
-    } else if (!e.shiftKey && (active === last || !drawer.contains(active))) {
-      e.preventDefault(); first.focus();
+  $("drawer").addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeDrawer();
+  });
+
+  $("drawer").addEventListener("close", () => {
+    if ($("drawer").classList.contains("layout-editor")) {
+      $("dashboard-preview").append($("badge-preview"));
     }
-  }
+    if (scannerActive()) focusScan();
+  });
 
   // ================= Manual-entry <details> persistence (open by default) =================
   const MANUAL_KEY = "ep-manual-open";
@@ -91,7 +112,8 @@
   // Scanner preference affects the dashboard only; API routes stay available.
   function _syncScanSection(connected, visible) {
     const sz = $("scan-section");
-    if (sz) { sz.hidden = !visible; sz.open = !!connected && visible; }
+    sz.hidden = !visible;
+    if (connected && visible && $("scan-input").disabled) sz.open = true;
   }
 
   const log = (msg, kind = "") => {
@@ -110,7 +132,7 @@
   };
 
   function toast(msg, kind = "ok") {
-    const wrap = $("toasts");
+    const wrap = $($("drawer").open ? "settings-toasts" : "toasts");
     const t = document.createElement("div");
     t.className = "toast " + kind;
     const icon = document.createElement("span");
@@ -129,12 +151,12 @@
   async function refresh() {
     try {
       const r = await fetch("/health");
+      if (!r.ok) throw new Error("HTTP " + r.status);
       const j = await r.json();
       $("info-printer").textContent = j.printer || "—";
-      $("info-outdir").textContent = j.output_dir || "—";
       $("port").textContent = location.host;
       $("health-dot").className = "dot ok";
-      $("health-text").textContent = "Ready";
+      $("health-text").textContent = "Station online";
     } catch (e) {
       $("health-dot").className = "dot err";
       $("health-text").textContent = "Not responding";
@@ -461,7 +483,6 @@
     sel.innerHTML = "";
     const blank = document.createElement("option");
     blank.value = "";
-    blank.textContent = "New layout (not saved yet)";
     sel.appendChild(blank);
     for (const name of Object.keys(layoutPresets)) {
       const opt = document.createElement("option");
@@ -470,7 +491,7 @@
       sel.appendChild(opt);
     }
     sel.value = layoutPresets[activePreset] ? activePreset : "";
-    $("preset-delete").disabled = !sel.value;
+    $("preset-delete").hidden = !sel.value;
     syncSaveUI();
   }
 
@@ -489,6 +510,9 @@
     if (!btn || !note) return;
     const name = layoutPresets[activePreset] ? activePreset : "";
     const dirty = layoutDirty();
+    $("preview-draft").hidden = !dirty;
+    const current = $("layout-preset-select").options[0];
+    current.textContent = !name && dirty ? "Current layout (unsaved changes)" : "Current layout";
     btn.textContent = name ? "Update “" + name + "”" : "Save layout";
     let msg = "";
     if (name && dirty) {
@@ -510,9 +534,8 @@
       return;
     }
     activePreset = name;
-    $("preset-delete").disabled = !name;
-    // Picking "New layout" only detaches from the saved one — the editor
-    // keeps what's on screen so it can be saved under a new name.
+    $("preset-delete").hidden = !name;
+    // Picking Current layout detaches the working layout from its named preset.
     const layout = name ? layoutPresets[name] : null;
     if (layout) renderLayoutEditor(layout);
     try {
@@ -526,7 +549,7 @@
       layoutPresets = j.layout_presets || {};
       if (layout) { renderLayoutEditor(j.layout); markLayoutSaved(); updatePreview(); }
       renderPresetSelect();
-      toast(name ? "Loaded \"" + name + "\"" : "New layout started — saved layouts are untouched");
+      toast(name ? "Loaded \"" + name + "\"" : "Using the current layout");
     } catch (e) {
       log("preset load failed: " + e, "err");
       toast("Couldn't switch layout", "err");
@@ -603,63 +626,45 @@
     title: "f-title",
     country: "f-country",
     table_no: "f-table",
+    qr: "f-ticket",
   };
 
   function syncManualFields() {
-    let hiddenCount = 0;
+    const form = $("ticket-form");
+    const actions = form.querySelector(".actions");
+    form.querySelectorAll("[data-custom-el]").forEach((label) => label.remove());
     for (const [el, id] of Object.entries(FIELD_FOR_EL)) {
       const input = $(id);
-      const label = input.closest("label");
       const show = layoutElements.includes(el);
-      label.hidden = !show;
+      input.closest("label").hidden = !show;
       input.disabled = !show;
-      if (!show) hiddenCount++;
     }
     $("f-group-sel").disabled = $("f-group").disabled;
-    // Ticket ID only feeds the QR code — hide it when QR isn't on the badge.
-    // Must also disable it: a hidden-but-required enabled input would block
-    // form submission with no visible error.
-    const ticketInput = $("f-ticket");
-    const ticketVisible = layoutElements.includes("qr");
-    const ticketLabel = ticketInput.closest("label");
-    ticketLabel.hidden = !ticketVisible;
-    ticketInput.disabled = !ticketVisible;
-    if (!ticketVisible) hiddenCount++;
-    // Position / Table No. row: collapse to one column when only one remains
-    const titleShown = !$("f-title").closest("label").hidden;
-    const tableShown = !$("f-table").closest("label").hidden;
-    $("f-title").closest(".field-row").classList.toggle("single", titleShown !== tableShown);
-    const note = $("manual-layout-note");
-    if (note) {
-      note.hidden = hiddenCount === 0;
-      note.textContent = "Only fields used by your badge layout are shown — change it in Settings → Badge layout.";
+    $("manual-layout-note").hidden = !form.querySelector("label[hidden]");
+    for (const el of layoutElements) {
+      if (Object.hasOwn(FIELD_FOR_EL, el)) {
+        form.insertBefore($(FIELD_FOR_EL[el]).closest("label"), actions);
+      } else if (customFieldDefs[el]?.label) {
+        form.insertBefore(customEntryField(el), actions);
+      }
     }
-    renderCustomEntryFields();
   }
 
-  // ================= Custom field manual-entry inputs =================
-  function renderCustomEntryFields() {
-    const wrap = $("custom-entry-fields");
-    if (!wrap) return;
-    wrap.innerHTML = "";
-    const shown = layoutElements.filter((el) => customFieldDefs[el] && customFieldDefs[el].label);
-    for (const el of shown) {
-      const def = customFieldDefs[el];
-      const label = document.createElement("label");
-      label.textContent = def.label;
-      const input = document.createElement("input");
-      input.type = "text";
-      input.dataset.customEl = el;
-      input.value = customValues[el] || "";
-      input.placeholder = def.label;
-      input.addEventListener("input", () => {
-        customValues[el] = input.value.trim();
-        schedulePreview();
-      });
-      label.appendChild(input);
-      wrap.appendChild(label);
-    }
-    wrap.style.display = shown.length ? "" : "none";
+  function customEntryField(el) {
+    const def = customFieldDefs[el];
+    const label = document.createElement("label");
+    label.dataset.customEl = el;
+    label.textContent = def.label;
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = customValues[el] || "";
+    input.placeholder = def.label;
+    input.addEventListener("input", () => {
+      customValues[el] = input.value.trim();
+      schedulePreview();
+    });
+    label.appendChild(input);
+    return label;
   }
 
   let _layoutDragEl = null;
@@ -709,7 +714,7 @@
       const edit = row.querySelector(".custom-inputs");
       const view = buildView();
       row.replaceChild(view, edit);
-      renderCustomEntryFields();
+      syncManualFields();
       schedulePreview();
       return true;
     }
@@ -1001,6 +1006,7 @@
     if (!sizingMode) row.appendChild(handle);
     const cb = document.createElement("input");
     cb.type = "checkbox";
+    cb.setAttribute("aria-label", "Include " + elLabel(el));
     cb.checked = enabled;
     cb.onchange = () => {
       if (cb.checked) layoutElements.push(el);
@@ -1128,10 +1134,12 @@
 
   // Debounced live preview — updates as the user types
   let _previewTimer = null;
-  function schedulePreview(delay) {
-    if (_previewTimer) clearTimeout(_previewTimer);
-    _previewTimer = setTimeout(updatePreview, delay == null ? 450 : delay);
-    setPreviewChip("updating…", "busy");
+  let _previewRequest = 0;
+  function schedulePreview(delay = 250) {
+    _previewRequest++;
+    clearTimeout(_previewTimer);
+    _previewTimer = setTimeout(updatePreview, delay);
+    setPreviewChip("Updating…", "busy");
     syncSaveUI();
   }
 
@@ -1157,29 +1165,30 @@
   }
 
   async function updatePreview() {
+    clearTimeout(_previewTimer);
+    const request = ++_previewRequest;
     const payload = { ticket: buildPayload(true), layout: buildLayoutState() };
-    setPreviewChip("rendering…", "busy");
+    setPreviewChip("Rendering…", "busy");
     try {
       const r = await fetch("/png-preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!r.ok) {
-        setPreviewChip("error", "err");
-        log("preview failed: " + r.status, "err");
-        return;
-      }
+      if (!r.ok) throw new Error("HTTP " + r.status);
       const blob = await r.blob();
+      if (request !== _previewRequest) return;
       if (lastPreviewBlobUrl) URL.revokeObjectURL(lastPreviewBlobUrl);
       lastPreviewBlobUrl = URL.createObjectURL(blob);
       const img = $("preview-img");
       img.src = lastPreviewBlobUrl;
-      img.style.display = "";
+      $("badge-object").hidden = false;
       $("preview-empty").style.display = "none";
-      setPreviewChip("up to date", "ok");
+      setPreviewChip("Live preview", "ok");
     } catch (e) {
-      setPreviewChip("error", "err");
+      if (request !== _previewRequest) return;
+      setPreviewChip("Preview unavailable", "err");
+      $("preview-empty").textContent = "The badge preview couldn’t load.";
       log("preview failed: " + e, "err");
     }
   }
@@ -1369,15 +1378,13 @@
   refresh().then(async () => {
     log("dashboard ready", "ok");
     await loadConfig();
-    const sz = $("scan-section");
-    const s = $("scan-input");
-    if (sz && sz.open && s && !s.disabled) focusScan(); else ($("f-ticket").closest("label").hidden ? $("f-name") : $("f-ticket")).focus();
+    if (scannerActive()) focusScan();
     updatePreview();
   });
   setInterval(refresh, 15000);
 
   ["f-ticket", "f-name", "f-company", "f-title", "f-country", "f-table", "f-type", "f-role", "f-group", "f-group-sel"].forEach((id) => {
-    $(id).addEventListener("input", schedulePreview);
+    $(id).addEventListener("input", () => schedulePreview());
   });
 
   initVoffsetControl();
@@ -1778,7 +1785,7 @@
     const d = document.createElement("div");
     d.className = "feed-empty";
     d.id = "feed-empty";
-    d.textContent = "No scans yet — the first ticket will appear here";
+    d.textContent = "No tickets scanned yet.";
     return d;
   }
 
@@ -2122,7 +2129,7 @@
     const sz = $("scan-section");
     const input = $("scan-input");
     return !!(sz && sz.open && !sz.hidden && input && !input.disabled
-      && !$("drawer").classList.contains("open"));
+      && !$("drawer").open);
   }
 
   function syncScanFocusCue() {
