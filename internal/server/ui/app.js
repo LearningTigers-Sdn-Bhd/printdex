@@ -1221,7 +1221,8 @@
 
   // ================= Software update =================
   // Polls the backend updater state machine and renders the Software section.
-  // Shown only when running as the installed exe (update_supported). Flow:
+  // Always shown; builds that can't update themselves (update_supported false:
+  // development or unsigned) can still check, but not install. Flow:
   // Check for updates -> (if newer) Update -> downloads with progress ->
   // "Restart to update" -> app swaps the exe and relaunches itself.
   let _updPollTimer = null;
@@ -1229,7 +1230,7 @@
   function _updShow(id, show) { const el = $(id); if (el) el.style.display = show ? "" : "none"; }
 
   function _renderUpdate(st) {
-    if (!st || !st.update_supported) { _updShow("update-section", false); return; }
+    if (!st) { _updShow("update-section", false); return; }
     _updShow("update-section", true);
     $("upd-current").textContent = "v" + (st.current_version || "?");
 
@@ -1268,17 +1269,18 @@
       statusEl.textContent = st.error || "Update failed.";
       statusEl.classList.add("err");
     } else if (st.update_available) {
-      statusEl.textContent = "Update available: v" + st.latest;
+      statusEl.textContent = "Update available: v" + st.latest +
+        (st.update_supported ? "" : " — this build can't install it; download it from the release page.");
       statusEl.classList.add("ok");
     } else if (st.latest) {
       statusEl.textContent = "You're on the latest version.";
     } else {
-      statusEl.textContent = "";
+      statusEl.textContent = st.update_supported ? "" : "Self-update is off in this build (development or unsigned).";
     }
 
     // Buttons
     checkBtn.disabled = phase === "checking" || downloading || phase === "applying";
-    const canUpdate = st.update_available && (phase === "idle" || phase === "error");
+    const canUpdate = st.update_supported && st.update_available && (phase === "idle" || phase === "error");
     const canApply = phase === "ready";
     if (canApply) {
       updateBtn.style.display = "";
@@ -1505,6 +1507,28 @@
   }
 
   // ================= Backend config =================
+  // Shows which event the saved ID or slug points to, so a typo is caught here
+  // and not at the first scan. Reports what the server has saved, not what is
+  // typed but unsaved.
+  async function checkEvent() {
+    const el = $("cfg-event-state");
+    el.className = "field-status";
+    if (!$("cfg-url").value.trim() || !$("cfg-slug").value.trim()) { el.textContent = ""; return null; }
+    el.textContent = "Checking the event…";
+    try {
+      const r = await fetch("/event");
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || r.status);
+      el.textContent = "✓ " + j.title + " (ID " + j.id + " · slug " + j.slug + ")";
+      el.classList.add("ok");
+      return j;
+    } catch (e) {
+      el.textContent = "× " + (e.message || e);
+      el.classList.add("err");
+      return null;
+    }
+  }
+
   async function loadConfig() {
     try {
       const r = await fetch("/config");
@@ -1517,6 +1541,7 @@
       const stateEl = $("cfg-key-state");
       stateEl.textContent = j.api_key_set ? "set (" + j.api_key_masked + ")" : "not set";
       updateScanState(j);
+      checkEvent();
       badgeTypes = j.badge_types || [];
       renderBadgeTypeOptions();
       renderBadgeTypesManager();
@@ -1587,11 +1612,13 @@
       const j = await r.json();
       if (!r.ok) { log("config save failed: " + (j.detail || r.status), "err"); toast("Couldn't save the settings", "err"); return; }
       log("backend config saved", "ok");
-      toast(j.show_scanner === false ? "Event connected — scanner hidden" : "Event connected — scanning is ready");
       $("cfg-key").value = "";
       const stateEl = $("cfg-key-state");
       stateEl.textContent = j.api_key_set ? "set (" + j.api_key_masked + ")" : "not set";
       updateScanState(j);
+      const event = await checkEvent();
+      if (event) toast("Connected to " + event.title + (j.show_scanner === false ? " — scanner hidden" : ""));
+      else toast("Saved, but the event couldn't be reached — see the note under Event ID or slug", "warn");
     } catch (e) {
       log("config save failed: " + e, "err");
       toast("Couldn't save the settings", "err");
@@ -1608,6 +1635,7 @@
       $("cfg-slug").value = "";
       $("cfg-key").value = "";
       $("cfg-key-state").textContent = "not set";
+      $("cfg-event-state").textContent = "";
       updateScanState(j);
       clearHistory();
       log("backend credentials cleared", "ok");
@@ -2034,6 +2062,7 @@
 
   // Shared by the scanner box and the guest search: one at a time, in order.
   async function enqueueScan(publicId) {
+    _searchCache.clear();
     if (_scanInFlight) {
       _scanQueue.push(publicId);
       log("queued: " + publicId);
@@ -2047,13 +2076,38 @@
   }
 
   // ================= Guest search (name / email / phone) =================
+  // Typing searches after a short pause. The server decides what the entry is
+  // (name, email or phone); the checks here only avoid a round trip while it is
+  // still too short, and only the newest request may draw. Results are
+  // keyboard-reachable: Down from the box, Up/Down between rows, Enter acts.
+  const SEARCH_CACHE_MS = 30000;
+  const SEARCH_PAGE = 10; // the backend returns at most this many
+  const SEARCH_PHONE_CHARS = /^[\d\s+()\-]+$/;
   let _searchTimer = null;
   let _searchSeq = 0;
+  let _searchAbort = null;
+  const _searchCache = new Map(); // query -> { at, data }
+
+  // Mirrors searchMethod in internal/server/server.go.
+  function searchMethod(q) {
+    const digits = q.replace(/\D/g, "");
+    if (q.includes("@")) return q.length >= 5 ? "email" : null;
+    if (digits && SEARCH_PHONE_CHARS.test(q)) return digits.length >= 4 ? "phone" : null;
+    return q.length >= 2 ? "name" : null;
+  }
+
+  function _searchHint(q) {
+    if (q.includes("@")) return "Keep typing the full email address.";
+    if (/\d/.test(q) && SEARCH_PHONE_CHARS.test(q)) return "Keep typing — a phone number needs at least 4 digits.";
+    return "Keep typing — a name needs at least 2 letters.";
+  }
 
   function clearSearch() {
     clearTimeout(_searchTimer);
     _searchSeq++;
+    if (_searchAbort) _searchAbort.abort();
     $("search-input").value = "";
+    $("search-results").classList.remove("loading");
     $("search-results").replaceChildren();
   }
 
@@ -2061,37 +2115,86 @@
     const d = document.createElement("div");
     d.className = "sr-empty";
     d.textContent = text;
+    $("search-results").classList.remove("loading");
     $("search-results").replaceChildren(d);
   }
 
   async function runSearch() {
-    const q = $("search-input").value.trim();
+    const q = $("search-input").value.trim().slice(0, 100);
     const seq = ++_searchSeq;
-    if (!q) { $("search-results").replaceChildren(); return; }
+    if (_searchAbort) _searchAbort.abort();
+    if (!q) { $("search-results").classList.remove("loading"); $("search-results").replaceChildren(); return; }
+    if (!searchMethod(q)) { _searchMsg(_searchHint(q)); return; }
+    const hit = _searchCache.get(q);
+    if (hit && Date.now() - hit.at < SEARCH_CACHE_MS) { _showResults(q, hit.data); return; }
+
+    const box = $("search-results");
+    box.classList.add("loading"); // keep the old rows, dimmed, rather than flash empty
+    _searchAbort = new AbortController();
     try {
-      const r = await fetch("/search?q=" + encodeURIComponent(q));
+      const r = await fetch("/search?q=" + encodeURIComponent(q), { signal: _searchAbort.signal });
       const j = await r.json();
       if (seq !== _searchSeq) return; // a newer keystroke superseded this one
       if (!r.ok) throw new Error(j.detail || r.status);
-      if (!j.method) { _searchMsg("Keep typing — a name (2+ letters), full email, or phone (4+ digits)."); return; }
-      if (!j.results.length) { _searchMsg("No paid ticket matches “" + q + "”."); return; }
-      $("search-results").replaceChildren(...j.results.map(_searchRow));
+      _searchCache.set(q, { at: Date.now(), data: j });
+      _showResults(q, j);
     } catch (e) {
-      if (seq === _searchSeq) _searchMsg("Search failed: " + (e.message || e));
+      if (e.name !== "AbortError" && seq === _searchSeq) _searchMsg("Search failed: " + (e.message || e));
     }
   }
 
-  function _searchRow(a) {
+  function _showResults(q, j) {
+    if (!j.results.length) { _searchMsg("No paid ticket matches “" + q + "”."); return; }
+    const n = j.results.length;
+    const head = document.createElement("div");
+    head.className = "sr-head";
+    head.textContent = ({ name: "Name", email: "Email", phone: "Phone" }[j.method] || "Guest") + " search · " +
+      (n >= SEARCH_PAGE ? SEARCH_PAGE + "+ guests, type more to narrow down" : n + (n === 1 ? " guest" : " guests")) +
+      " · ↓ to pick";
+    $("search-results").classList.remove("loading");
+    $("search-results").replaceChildren(head, ...j.results.map((a) => _searchRow(a, q, j.method)));
+  }
+
+  // The text with the parts that matched the query wrapped in <mark>. Phone
+  // numbers match across spaces and dashes; names match any typed word.
+  function _highlight(text, q, method) {
+    const frag = document.createDocumentFragment();
+    const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = method === "phone"
+      ? q.replace(/\D/g, "").split("").join("\\D*")
+      : q.split(/\s+/).filter(Boolean).map(escape).join("|");
+    const re = new RegExp(pattern, "gi");
+    let last = 0;
+    for (let m; (m = re.exec(text)) && m[0]; ) {
+      frag.append(text.slice(last, m.index));
+      const mark = document.createElement("mark");
+      mark.className = "sr-hit";
+      mark.textContent = m[0];
+      frag.append(mark);
+      last = m.index + m[0].length;
+    }
+    frag.append(text.slice(last));
+    return frag;
+  }
+
+  function _searchRow(a, q, method) {
     const row = document.createElement("div");
     row.className = "search-row";
     const main = document.createElement("div");
     main.className = "sr-main";
     const name = document.createElement("div");
     name.className = "sr-name";
-    name.textContent = a.name || a.public_id;
+    const label = a.name || a.public_id;
+    name.append(method === "name" ? _highlight(label, q, method) : label);
     const meta = document.createElement("div");
     meta.className = "sr-meta";
-    meta.textContent = [a.type_name, a.email, a.phone].filter(Boolean).join(" · ");
+    // Only the field that was searched is highlighted.
+    [[a.type_name, ""], [a.email, "email"], [a.phone, "phone"]]
+      .filter(([text]) => text)
+      .forEach(([text, field], i) => {
+        if (i) meta.append(" · ");
+        meta.append(field && field === method ? _highlight(text, q, method) : text);
+      });
     if (a.checked_in) {
       const tag = document.createElement("span");
       tag.className = "sr-in";
@@ -2112,6 +2215,18 @@
     row.append(main, btn);
     return row;
   }
+
+  $("search-results").addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { clearSearch(); focusScan(); return; }
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const buttons = [...$("search-results").querySelectorAll(".search-row button")];
+    const i = buttons.indexOf(document.activeElement);
+    if (i < 0) return;
+    e.preventDefault();
+    if (e.key === "ArrowDown") buttons[Math.min(i + 1, buttons.length - 1)].focus();
+    else if (i === 0) $("search-input").focus();
+    else buttons[i - 1].focus();
+  });
 
   // ================= Keep the scanner focused =================
   // Scanners type into whatever has focus, so after a name search (or any
@@ -2158,6 +2273,11 @@
     let burst = { text: "", t: 0, fast: true };
     search.addEventListener("keydown", (e) => {
       if (e.key === "Escape") { clearSearch(); focusScan(); return; }
+      if (e.key === "ArrowDown") {
+        const first = $("search-results").querySelector(".search-row button");
+        if (first) { e.preventDefault(); first.focus(); }
+        return;
+      }
       const now = performance.now();
       if (e.key.length === 1) {
         if (!search.value) burst = { text: "", t: now, fast: true };

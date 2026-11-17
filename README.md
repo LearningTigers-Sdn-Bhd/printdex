@@ -194,7 +194,7 @@ anyway** (the installer is not code-signed).
 **macOS** — open `PrintDex_<version>_universal.dmg` and drag PrintDex to
 Applications. First launch: right-click → **Open** (the app is not notarized).
 
-Then open the dashboard, enter the EventzFlow address, the event slug and the
+Then open the dashboard, enter the EventzFlow address, the event ID or slug (either works) and the
 event's API key, and press **Test print**.
 
 Stations upgrading from the earlier `event-printer` app keep their event
@@ -251,7 +251,9 @@ rejects state-changing requests from other websites.
 | `POST /print-test` | Print a test page |
 | `POST /png-preview` | Render a badge as PNG, with an optional unsaved layout |
 | `GET /printers` | Installed printers and the one in use |
+| `GET /event` | The connected event's name, ID and slug |
 | `GET /ticket-types`, `GET /ticket-groups` | The connected event's types and groups |
+| `GET /help` | The built-in help page: setup guide, troubleshooting, self-check |
 | `GET`, `PUT`, `DELETE /config` | Read, change, or disconnect the settings (API key masked) |
 | `GET /update/status`, `POST /update/{check,download,apply}` | Self-update |
 | `GET /server/status`, `POST /server/{restart,quit}` | Process control |

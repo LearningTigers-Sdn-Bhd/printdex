@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<title>PrintDex help</title>
+<script>
+  // Same theme as the dashboard, applied before first paint.
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem("ep-theme"); } catch (e) {}
+    if (saved === "light" || saved === "dark") document.documentElement.dataset.theme = saved;
+  })();
+</script>
+<link rel="stylesheet" href="/static/style.css" />
+<style>
+  main.help { display: block; max-width: 920px; }
+  .help h1 { margin: 0 0 6px; font-size: clamp(28px, 4vw, 40px); font-weight: 730; letter-spacing: -.045em; line-height: 1.1; }
+  .help .lede { margin: 0 0 18px; color: var(--muted); font-size: 14.5px; }
+  .help .zone { margin-bottom: 16px; padding: 18px 20px; scroll-margin-top: 84px; }
+  .help h2 { margin: 0 0 10px; font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
+  .help h3 { margin: 18px 0 6px; font-size: 14px; font-weight: 700; }
+  .help p { margin: 6px 0; }
+  .help ul, .help ol { margin: 6px 0; padding-left: 22px; }
+  .help li { margin: 4px 0; }
+  .help code, .help kbd {
+    font-family: var(--font-mono); font-size: 12px; padding: 1px 5px; border-radius: 5px;
+    background: var(--panel-2); border: 1px solid var(--line); overflow-wrap: anywhere;
+  }
+  .help kbd { border-bottom-width: 2px; }
+  .help a { color: var(--accent); }
+  .back { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--line);
+    border-radius: 9px; background: var(--panel); color: var(--accent); font-weight: 600; text-decoration: none; }
+  .help ul.toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; padding: 0; list-style: none; }
+  .toc a { display: inline-block; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px;
+    background: var(--panel); color: var(--ink-soft); font-weight: 600; font-size: 12.5px; text-decoration: none; }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+
+  ol.steps { list-style: none; counter-reset: step; padding: 0; }
+  ol.steps > li { counter-increment: step; position: relative; margin: 0 0 12px; padding-left: 40px; }
+  ol.steps > li::before {
+    content: counter(step); position: absolute; left: 0; top: 0; width: 27px; height: 27px; display: grid; place-items: center;
+    border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px;
+  }
+  ol.steps > li > strong:first-child { display: block; }
+  .note { margin: 10px 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
+  .note.warn { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--panel)); }
+  table.simple { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+  table.simple th, table.simple td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  table.simple th { color: var(--muted); font-size: 12px; font-weight: 600; }
+  .table-wrap { overflow-x: auto; }
+
+  details.fix { border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; background: var(--panel); }
+  details.fix > summary { cursor: pointer; padding: 10px 14px; font-weight: 600; list-style: none; display: flex; gap: 10px; align-items: baseline; }
+  details.fix > summary::-webkit-details-marker { display: none; }
+  details.fix > summary::before { content: "▸"; color: var(--muted); transition: transform .12s; flex: none; }
+  details.fix[open] > summary::before { transform: rotate(90deg); }
+  details.fix > summary:hover { color: var(--accent); }
+  details.fix .body { padding: 0 14px 12px 34px; }
+  details.fix .why { color: var(--muted); }
+  .group-title { margin: 20px 0 4px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+
+  /* Self-check */
+  .check-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .check-row { display: grid; grid-template-columns: 26px 1fr; gap: 4px 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .check-row .mark { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; font-weight: 800; font-size: 13px; color: var(--muted); background: var(--panel-2); }
+  .check-row.ok .mark { color: var(--ok); background: color-mix(in srgb, var(--ok) 16%, var(--panel)); }
+  .check-row.fail .mark { color: var(--err); background: color-mix(in srgb, var(--err) 16%, var(--panel)); }
+  .check-row.warn .mark { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, var(--panel)); }
+  .check-row .t { font-weight: 650; }
+  .check-row .m { color: var(--ink-soft); overflow-wrap: anywhere; }
+  .check-row .f { grid-column: 2; color: var(--muted); }
+  .check-summary { margin: 10px 0 0; font-weight: 650; }
+  textarea.report { width: 100%; min-height: 150px; margin-top: 8px; font-family: var(--font-mono); font-size: 12px; }
+  .foot { color: var(--muted); font-size: 12.5px; text-align: center; padding: 8px 0 30px; }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">P</div>
+      <div>
+        <span class="brand-name">PrintDex</span>
+        <span class="brand-context">Help</span>
+      </div>
+    </div>
+    <div class="topbar-right"><a class="back" href="/">← Back to station</a></div>
+  </header>
+
+  <main class="help">
+    <h1>How to use PrintDex</h1>
+    <p class="lede">Scan a guest's ticket, they are checked in on EventzFlow, and their badge prints. This page covers setup, daily use, and what to do when something goes wrong.</p>
+
+    <ul class="toc">
+      <li><a href="#start">Set up</a></li>
+      <li><a href="#daily">Daily use</a></li>
+      <li><a href="#layout">Badge layout</a></li>
+      <li><a href="#selfcheck">Self-check</a></li>
+      <li><a href="#fix">Fix a problem</a></li>
+      <li><a href="#investigate">Investigate</a></li>
+      <li><a href="#reference">Reference</a></li>
+    </ul>
+
+    <!-- ============ SET UP ============ -->
+    <section class="zone" id="start">
+      <h2>Set up a station (first time)</h2>
+      <ol class="steps">
+        <li><strong>Connect and switch on the printer</strong>
+          Install its driver if the computer doesn't list it already. It must appear in <em>Printers &amp; scanners</em> (Windows) or <em>Printers &amp; Scanners</em> (macOS) before PrintDex can use it. Load the label stock.</li>
+        <li><strong>Open PrintDex and go to Settings → Event</strong>
+          Press the gear icon at the top right, then the <em>Event</em> tab.</li>
+        <li><strong>Enter the three connection details</strong>
+          <ul>
+            <li><b>Website address</b> — your EventzFlow address, starting with <code>https://</code>.</li>
+            <li><b>Event ID or slug</b> — either the event's number or the short name in its web address. Both work.</li>
+            <li><b>API key</b> — the key for this event, from your EventzFlow admin. Type it in full the first time; leaving the box empty later keeps the saved one.</li>
+          </ul>
+          Press <b>Save</b>. A green line under <em>Event ID or slug</em> shows the event's name, ID and slug. If you see that, the connection is right.</li>
+        <li><strong>Check the printer: Settings → Station</strong>
+          Under <em>Printer</em> you should see your printer's name. Press <b>Test print</b>: a bordered page with the time should come out.</li>
+        <li><strong>Set up the badge</strong>
+          Press <b>Edit badge layout</b> on the main screen. Set the paper size to your label stock, choose what to print, and check the live preview. Save. See <a href="#layout">Badge layout</a>.</li>
+        <li><strong>Choose who gets no badge (optional)</strong>
+          Settings → Event → <em>Check in without a badge</em>: tick the ticket types that should be checked in but not printed (for example staff).</li>
+        <li><strong>Try one real scan</strong>
+          Scan a test ticket. You should see "Checked in — badge printing" and a badge come out. Then run the <a href="#selfcheck">self-check</a> once so you know everything is green before doors open.</li>
+      </ol>
+    </section>
+
+    <!-- ============ DAILY USE ============ -->
+    <section class="zone" id="daily">
+      <h2>Using it during the event</h2>
+      <h3>Scanning</h3>
+      <p>Keep the cursor in the <em>Ticket code</em> box (it takes focus back by itself). Point the scanner at the guest's QR code. The scanner types the code and presses Enter, and PrintDex does the rest: looks the ticket up, checks the guest in, prints the badge. You do not need to press <b>Check in &amp; print</b> when using a scanner; that button is for typing a code by hand.</p>
+      <p>If several guests are scanned quickly, they wait in line and are handled one at a time, in order.</p>
+
+      <h3>What the screen tells you</h3>
+      <div class="table-wrap"><table class="simple">
+        <tr><th>You see</th><th>It means</th><th>What to do</th></tr>
+        <tr><td><b style="color:var(--ok)">✓ Checked in — badge printing</b></td><td>All done: guest is in, badge sent to the printer.</td><td>Hand over the badge.</td></tr>
+        <tr><td><b>✓ Checked in — no badge</b></td><td>Guest is in. Their ticket type is on the "no badge" list.</td><td>Press <b>Print</b> if they need a badge anyway.</td></tr>
+        <tr><td><b style="color:var(--err)">! Checked in — badge didn't print</b></td><td>Guest <em>is</em> checked in, but the printer refused. The reason is shown under the name.</td><td>Fix the printer, then press <b>Retry print</b>. <b>Do not scan again</b>: it would only say "already checked in".</td></tr>
+        <tr><td><b style="color:var(--warn)">↻ Already checked in</b></td><td>This ticket was scanned before. Shows when, by whom and where, when known. Nothing is printed.</td><td>If they lost their badge, press <b>Reprint</b>. Otherwise check the details before letting them in.</td></tr>
+        <tr><td><b style="color:var(--err)">× Not checked in</b> with a reason</td><td>The ticket wasn't found, or EventzFlow refused the check-in (for example unpaid).</td><td>Read the reason and see <a href="#fix">Fix a problem</a>.</td></tr>
+      </table></div>
+
+      <h3>Guest has no QR code</h3>
+      <p>Use <em>Search by name, email or phone</em> under the scan box. Type at least 2 letters of a name, a full email address (it needs an <code>@</code>), or at least 4 digits of a phone number. Results show paid tickets only, up to 10; type more to narrow them down. Press <b>Check in</b> on the right guest, or <b>Reprint</b> if they are already in.</p>
+      <p>Keyboard: <kbd>↓</kbd> moves from the box into the results, <kbd>↑</kbd>/<kbd>↓</kbd> move between guests, <kbd>Enter</kbd> acts on the selected one, <kbd>Esc</kbd> clears the search and returns to the scanner.</p>
+
+      <h3>Print a badge without checking anyone in</h3>
+      <p>Open <em>Manual entry</em>, fill in the fields, and press <b>Print badge</b>. Nothing is sent to EventzFlow. Useful for walk-ups, spare badges and testing the layout. Every row in <em>Recent</em> also has a <b>Reprint</b> button.</p>
+
+      <h3>The Recent list</h3>
+      <p><em>Recent</em> lists this session's scans, newest first, with a count of how many checked in and how many were repeats. It is kept only while the window stays open: reloading or restarting empties it (the check-ins themselves are safe on EventzFlow). <b>Clear</b> empties it on screen.</p>
+    </section>
+
+    <!-- ============ LAYOUT ============ -->
+    <section class="zone" id="layout">
+      <h2>Badge layout</h2>
+      <p>The badge is a stack of lines centered on the label: the guest's name, ticket type, optional details, and a QR code of the ticket. You choose what goes in the stack and in which order; PrintDex picks the text sizes.</p>
+      <ul>
+        <li><b>Paper size</b> must match your label stock in millimetres (20–500 mm each way). A mismatch is the most common reason for badges printing off the label.</li>
+        <li><b>Fields</b>: name, ticket type, company, title, country, table number, ticket group, ticket role, plus up to 6 custom fields you add. A field with nothing in it for a guest is skipped.</li>
+        <li><b>Sizes are automatic.</b> Names use the biggest size that fits, on one line or two. A badge with few fields grows its text to fill the label (within limits, so the name stays the biggest thing). A crowded badge shrinks the QR code first (never below about 14 mm, so it stays scannable), then the text, down to 8 pt.</li>
+        <li><b>Adjust</b> lets you change an element's size (0.5×–2×), make it bold, or nudge it up to 10 mm. <b>Vertical offset</b> slides the whole stack up or down by up to 80 mm.</li>
+        <li><b>Saved layouts</b> keep different designs (for example one per ticket class) so you can switch with one click.</li>
+        <li>The preview is drawn the same way as the print, so what you see is what comes out. Unsaved edits show in the preview; <b>printing uses the last saved layout</b>.</li>
+        <li><b>Direct thermal tags</b> (Settings → Event): turn on if text prints with missing dots on rough or thick tags. It prints bolder.</li>
+      </ul>
+    </section>
+
+    <!-- ============ SELF CHECK ============ -->
+    <section class="zone" id="selfcheck">
+      <h2>Self-check</h2>
+      <p>Press <b>Run checks</b> to test each part of the station in turn. Anything that fails says what to do. Run it before doors open, and again whenever something looks wrong.</p>
+      <div class="check-actions">
+        <button type="button" id="run-checks">Run checks</button>
+        <button type="button" class="ghost" id="print-test">Print a test page</button>
+        <button type="button" class="ghost" id="copy-report">Copy report</button>
+      </div>
+      <div id="check-list" aria-live="polite"></div>
+      <p class="check-summary" id="check-summary" role="status"></p>
+      <div class="note" id="print-result" hidden></div>
+      <textarea class="report" id="report" readonly hidden aria-label="Report to send to support"></textarea>
+      <p class="why" style="color:var(--muted);font-size:12.5px">The report contains the version, printer, event name and which checks passed. It never contains the API key.</p>
+    </section>
+
+    <!-- ============ FIX A PROBLEM ============ -->
+    <section class="zone" id="fix">
+      <h2>Something went wrong</h2>
+      <p>Find what you see on screen, open it, and follow the steps. Messages in <code>code style</code> are the exact words PrintDex shows.</p>
+
+      <div class="group-title">Connecting to EventzFlow</div>
+
+      <details class="fix"><summary>The scan box says "Connect your event first", or a banner says "Connect EventzFlow to scan tickets."</summary>
+        <div class="body"><p class="why">One of the three connection details is missing.</p>
+        <ol><li>Settings → Event.</li><li>Fill in Website address, Event ID or slug and API key, then <b>Save</b>.</li><li>Confirm the green line shows your event's name.</li></ol></div></details>
+
+      <details class="fix"><summary><code>Event not found. Check the event ID or slug.</code></summary>
+        <div class="body"><p class="why">EventzFlow does not know an event by what was entered.</p>
+        <ol><li>Copy the ID or slug again from the event in EventzFlow; check for typos or a trailing space.</li>
+        <li>Try the other form: if the slug fails, use the numeric ID, or the other way round.</li>
+        <li>Check the <b>Website address</b>: an event that lives on one EventzFlow server (for example staging) isn't found on another (production).</li></ol></div></details>
+
+      <details class="fix"><summary><code>Not authorized. Check your API key.</code> or <code>…Check your API key permissions.</code></summary>
+        <div class="body"><p class="why">The API key is wrong, expired, belongs to another event, or isn't allowed to check guests in.</p>
+        <ol><li>Ask your EventzFlow admin for the event's key and confirm it can check guests in.</li>
+        <li>Settings → Event → paste the full key → <b>Save</b>. (An empty key box keeps the old one, so the new key must be typed in.)</li>
+        <li>Run the <a href="#selfcheck">self-check</a>: "API key accepted" should turn green.</li></ol></div></details>
+
+      <details class="fix"><summary><code>Network error contacting backend: …</code></summary>
+        <div class="body"><p class="why">PrintDex couldn't reach EventzFlow at all. The text after the colon says why: <code>connection refused</code> (nothing listening at that address), <code>no such host</code> (address misspelled or no internet/DNS), <code>timeout</code> (network too slow or blocked), <code>certificate</code> (the computer's clock is wrong, or a venue network is intercepting secure connections).</p>
+        <ol><li>Check the computer's internet connection; open the Website address in a browser on the same computer.</li>
+        <li>Check the address begins with <code>https://</code> and has no extra path at the end.</li>
+        <li>Check the computer's date and time are right.</li>
+        <li>On a venue network, ask whether outgoing HTTPS is restricted or a proxy is needed.</li>
+        <li>No guest is checked in while this error shows, so it is safe to scan again once the connection is back.</li></ol></div></details>
+
+      <details class="fix"><summary><code>The backend address is not valid.</code></summary>
+        <div class="body"><p class="why">The Website address isn't a usable address.</p>
+        <p>Re-enter it in full, for example <code>https://app.eventzflow.com</code>, with no spaces.</p></div></details>
+
+      <details class="fix"><summary><code>Lookup failed (500)</code> / <code>(502)</code> / <code>(503)</code> or similar</summary>
+        <div class="body"><p class="why">EventzFlow itself had a problem answering.</p>
+        <ol><li>Wait a moment and scan again; nobody was checked in by the failed attempt.</li>
+        <li>If it keeps happening, tell your EventzFlow admin, with the time and the ticket code.</li>
+        <li>Meanwhile, you can still print badges by hand with <em>Manual entry</em>.</li></ol></div></details>
+
+      <div class="group-title">Scanning and tickets</div>
+
+      <details class="fix"><summary><code>Ticket not found for this event.</code></summary>
+        <div class="body"><p class="why">EventzFlow has no ticket with that code in this event.</p>
+        <ol><li>The ticket may belong to a different event, or have been cancelled or deleted.</li>
+        <li>The code may be damaged by the scanner (extra characters at the start or end, wrong letters). Look at what was typed into the box; see "The scanner types the wrong characters" below.</li>
+        <li>Find the guest with <em>Search by name, email or phone</em> instead.</li></ol></div></details>
+
+      <details class="fix"><summary>A red "Not checked in" with a message such as "Ticket is not paid"</summary>
+        <div class="body"><p class="why">EventzFlow refused the check-in and said why. PrintDex shows its message as it is. The guest is not checked in and no badge is printed.</p>
+        <ol><li>Read the message under the name.</li><li>Fix the cause in EventzFlow (for example confirm the payment), then scan again.</li></ol></div></details>
+
+      <details class="fix"><summary>"Already checked in" but the guest says it's their first time</summary>
+        <div class="body"><p class="why">The ticket really was scanned before. The line "First scanned … by … at …" says when and where, when EventzFlow knows.</p>
+        <ol><li>Check the time and the operator or gate. Another station, another PrintDex, or RfiDex may have scanned it.</li>
+        <li>If it was a genuine earlier scan and they only need a badge, press <b>Reprint</b>.</li>
+        <li>If you suspect a shared or copied ticket, handle it as your event rules say; PrintDex does not undo check-ins.</li></ol></div></details>
+
+      <details class="fix"><summary>The scan box shows "Scanner paused", or the scanner types nothing</summary>
+        <div class="body"><p class="why">The scan box doesn't have the keyboard focus, or a window is open on top of it (Settings pauses the scanner).</p>
+        <ol><li>Close Settings, then click the scan box.</li>
+        <li>Check the scanner is connected and has power (cable, or Bluetooth paired and charged). A scanner is a keyboard to the computer.</li>
+        <li>Test the scanner in a text editor. If it doesn't type there either, the problem is the scanner or its connection, not PrintDex.</li></ol></div></details>
+
+      <details class="fix"><summary>The scanner types the code but nothing happens</summary>
+        <div class="body"><p class="why">The scanner isn't sending Enter after the code, so PrintDex never gets the signal to start.</p>
+        <ol><li>Press <b>Check in &amp; print</b> by hand to confirm the code works.</li>
+        <li>Set the scanner to send "Enter" (carriage return) after each scan. The scanner's manual has a setup barcode for this.</li></ol></div></details>
+
+      <details class="fix"><summary>The scanner types the wrong characters (letters swapped, symbols instead of digits)</summary>
+        <div class="body"><p class="why">The scanner's keyboard language doesn't match the computer's.</p>
+        <p>Set the scanner's keyboard layout to the one the computer uses (setup barcode in the scanner manual), or change the computer's input language to match.</p></div></details>
+
+      <details class="fix"><summary>I scanned a ticket twice and nothing happened the second time</summary>
+        <div class="body"><p class="why">A repeat of the same code within about 3 seconds is ignored on purpose, to stop a double-read from checking in or printing twice. After that, a second scan shows "Already checked in".</p></div></details>
+
+      <div class="group-title">Printing</div>
+
+      <details class="fix"><summary><code>Printing failed: no printer found; connect a printer and try again</code></summary>
+        <div class="body"><p class="why">The computer lists no printer.</p>
+        <ol><li>Check the printer's power and cable, and that its driver is installed.</li>
+        <li>Confirm it appears in <em>Printers &amp; scanners</em> (Windows) or <em>Printers &amp; Scanners</em> (macOS).</li>
+        <li>Settings → Station → <b>Refresh</b>. The printer name should appear.</li>
+        <li>Press <b>Retry print</b> on the badge that didn't print. The guest is already checked in; do not rescan.</li></ol></div></details>
+
+      <details class="fix"><summary>It prints, but on the wrong printer</summary>
+        <div class="body"><p class="why">PrintDex uses, in order: the <code>PRINTER_NAME</code> setting, the only installed printer, the computer's default printer, then the first one found.</p>
+        <ol><li>Quick fix: set the label printer as the computer's default printer.</li>
+        <li>Firm fix: put <code>PRINTER_NAME=Exact Printer Name</code> in a <code>.env</code> file next to PrintDex and restart it. See <a href="#reference">Reference</a>.</li></ol></div></details>
+
+      <details class="fix"><summary><code>Printing failed: lp: …</code> (macOS)</summary>
+        <div class="body"><p class="why">macOS's print system (CUPS) refused the job; the words after <code>lp:</code> are its reason.</p>
+        <ol><li>Open <em>System Settings → Printers &amp; Scanners</em>, open the printer's queue, and make sure it isn't paused or showing an error. Resume it.</li>
+        <li>Remove stuck jobs from the queue.</li>
+        <li>If it still fails, remove and add the printer again with its driver.</li>
+        <li>In Terminal, <code>lpstat -p -d</code> shows printer state and the default; <code>lpstat -o</code> shows queued jobs.</li></ol></div></details>
+
+      <details class="fix"><summary><code>Printing failed: could not open printer "…"</code> (Windows)</summary>
+        <div class="body"><p class="why">Windows has no printer with exactly that name, usually because it was renamed, removed, or <code>PRINTER_NAME</code> is misspelled.</p>
+        <ol><li>Check the name in <em>Printers &amp; scanners</em> and copy it exactly.</li>
+        <li>Fix or remove <code>PRINTER_NAME</code> in the <code>.env</code> file, then restart PrintDex.</li></ol></div></details>
+
+      <details class="fix"><summary><code>printer "…" refused the job</code>, <code>could not start a page</code>, <code>did not accept the job</code> or <code>rejected the badge image</code> (Windows)</summary>
+        <div class="body"><p class="why">Windows reached the printer but it wouldn't take the job: usually offline, paused, an error light, a stuck spooler, or a driver that doesn't handle images well.</p>
+        <ol><li>Look at the printer: power, paper/label jam, lid closed, error light.</li>
+        <li>Open the printer's queue in <em>Printers &amp; scanners</em>; if it says offline or paused, fix that; cancel all stuck jobs.</li>
+        <li>Restart the <em>Print Spooler</em> service (Services → Print Spooler → Restart).</li>
+        <li>Reinstall the manufacturer's own driver (not a generic one).</li>
+        <li>Press <b>Test print</b> in Settings → Station to confirm. Then <b>Retry print</b> on the badge.</li></ol></div></details>
+
+      <details class="fix"><summary>"Checked in — badge didn't print"</summary>
+        <div class="body"><p class="why">The check-in worked; only the printing failed. The reason is under the guest's name.</p>
+        <ol><li>Fix the cause (see the printer entries above).</li><li>Press <b>Retry print</b>.</li><li>Do not scan the ticket again.</li></ol></div></details>
+
+      <details class="fix"><summary>Test print works, but real badges don't</summary>
+        <div class="body"><p class="why">The printer is fine; the problem is in the badge or the data.</p>
+        <ol><li>Open <em>Manual entry</em> and press <b>Print badge</b>. This prints a badge with no EventzFlow involved. If it works, the layout and printer are fine and the problem is the ticket's data or the connection.</li>
+        <li>If it fails, look at the message and the layout's paper size.</li></ol></div></details>
+
+      <div class="group-title">The badge looks wrong</div>
+
+      <details class="fix"><summary>The text sits off the label, is cut off, or the printer feeds a blank label</summary>
+        <div class="body"><p class="why">The paper size in the layout doesn't match the label stock or the printer's own page size.</p>
+        <ol><li>Measure the label (width × height in millimetres). Set the same in the layout, and in the printer driver's page/paper size.</li>
+        <li>Use <b>Vertical offset</b> or an element's nudge to shift things a few millimetres.</li>
+        <li>Calibrate the printer's label (gap) sensor as its manual describes, especially after changing stock.</li></ol></div></details>
+
+      <details class="fix"><summary>The badge comes out upside down (Windows)</summary>
+        <div class="body"><p class="why">On Windows, PrintDex turns every badge 180° to suit how the station printers feed labels.</p>
+        <ol><li>Set <em>rotation 180°</em> in the printer driver's preferences to cancel it, or</li>
+        <li>ask the maintainer to switch <code>rotate180</code> off in the code.</li></ol></div></details>
+
+      <details class="fix"><summary>Text is faint, or has missing dots and broken strokes</summary>
+        <div class="body"><ol>
+        <li>Turn on <b>Direct thermal tags</b> (Settings → Event). It prints bolder.</li>
+        <li>Raise the printer's darkness/density in the driver, or slow the print speed.</li>
+        <li>Clean the print head; rough or very thick tag stock drops dots.</li></ol></div></details>
+
+      <details class="fix"><summary>Text is too heavy or blobby</summary>
+        <div class="body"><ol><li>Turn <b>Direct thermal tags</b> off if it is on.</li><li>Lower the printer's darkness/density.</li></ol></div></details>
+
+      <details class="fix"><summary>A name is too small, or breaks over two lines</summary>
+        <div class="body"><p class="why">That is the automatic sizing: long names use two lines and a smaller size so they fit; very long ones go down to 8 pt.</p>
+        <ol><li>Make the paper wider, or remove other fields so more room is left.</li>
+        <li>Use <b>Adjust</b> on the name to scale it up or down (0.5×–2×).</li></ol></div></details>
+
+      <details class="fix"><summary>The QR code won't scan</summary>
+        <div class="body"><ol>
+        <li>Give it more room: remove a field or use a bigger label. On a crowded badge the QR code is shrunk to make space, and below about 14 mm it scans poorly.</li>
+        <li>Check print darkness (a faint print scans badly); avoid Direct thermal mode if the QR looks blurred.</li>
+        <li>Test with the scanner on a freshly printed badge in good light.</li></ol></div></details>
+
+      <details class="fix"><summary>The preview looks right but the printed badge differs in size or position</summary>
+        <div class="body"><p class="why">The printer driver is rescaling the page.</p>
+        <ol><li>In the driver, set scaling to 100% / "actual size" (not "fit to page") and the page size to the label size.</li>
+        <li>macOS: if prints come out tiny or huge, set <code>PRINT_DPI</code> to the printer's resolution (203 or 300) and restart. See <a href="#reference">Reference</a>.</li></ol></div></details>
+
+      <div class="group-title">The station itself</div>
+
+      <details class="fix"><summary>The "Station online" light is red, or the page stops responding</summary>
+        <div class="body"><ol>
+        <li>Settings → Station → <b>Restart</b>. If the page won't respond, close PrintDex and open it again.</li>
+        <li>Nothing is lost: check-ins are already on EventzFlow.</li></ol></div></details>
+
+      <details class="fix"><summary><code>the local API port is in use; is another copy running?</code>, or RfiDex can't reach the printer</summary>
+        <div class="body"><p class="why">Another program is already using port 8000 on this computer, most often a second copy of PrintDex or the old event-printer app. RfiDex looks for PrintDex at <code>http://127.0.0.1:8000</code>.</p>
+        <ol><li>Quit the other copy (Task Manager on Windows, Activity Monitor on macOS), then open PrintDex again.</li>
+        <li>The window can still print while the port is busy; only RfiDex's link is down.</li>
+        <li>To use a different port, set <code>PORT</code>, but RfiDex must then be pointed at the same port.</li></ol></div></details>
+
+      <details class="fix"><summary>The window is blank or shows an error (Windows)</summary>
+        <div class="body"><p class="why">Windows needs Microsoft's WebView2 runtime to show the window. The installer normally adds it.</p>
+        <p>Install "Microsoft Edge WebView2 Runtime" from Microsoft, or reinstall PrintDex with an internet connection.</p></div></details>
+
+      <details class="fix"><summary>My settings disappeared after an update or reinstall</summary>
+        <div class="body"><p class="why">Settings live in one file, not inside the app. Updating and reinstalling keep it. See the path under <a href="#reference">Reference</a>.</p>
+        <ol><li>If the file is gone, re-enter the Event details and layout.</li>
+        <li>A station coming from the older event-printer app imports that app's settings the first time PrintDex starts, only if PrintDex has no file of its own yet.</li></ol></div></details>
+
+      <div class="group-title">Updates</div>
+
+      <details class="fix"><summary>"Self-update is off in this build"</summary>
+        <div class="body"><p class="why">This copy was built without an update key (a development or unsigned build), so it can only check, not install.</p>
+        <p>Install the latest release from the releases page instead.</p></div></details>
+
+      <details class="fix"><summary><code>Couldn't check for updates: …</code></summary>
+        <div class="body"><p class="why">PrintDex couldn't reach the release page (no internet, or the release server is blocked or down).</p>
+        <p>Check the internet connection and try again. Updates are optional; the station keeps working.</p></div></details>
+
+      <details class="fix"><summary><code>the download's signature is not valid</code></summary>
+        <div class="body"><p class="why">The downloaded file wasn't signed by the publisher, or was damaged on the way. PrintDex refuses to install it.</p>
+        <p>Don't install it. Download the installer again from the official releases page, and tell the maintainer if it repeats.</p></div></details>
+
+      <details class="fix"><summary><code>Couldn't install the update: …</code> or <code>Updated, but couldn't restart.</code></summary>
+        <div class="body"><ol>
+        <li>If it says it couldn't restart: close PrintDex and open it again; the update is already in place.</li>
+        <li>If it couldn't install: the program's folder isn't writable (for example it was copied into a protected folder). Reinstall with the installer.</li></ol></div></details>
+    </section>
+
+    <!-- ============ INVESTIGATE ============ -->
+    <section class="zone" id="investigate">
+      <h2>How to investigate</h2>
+      <p>When it isn't obvious what's wrong, narrow it down by testing one part at a time:</p>
+      <div class="table-wrap"><table class="simple">
+        <tr><th>Test</th><th>Tests</th><th>If it fails</th></tr>
+        <tr><td><b>Test print</b> (Settings → Station)</td><td>Printer, driver and label stock only.</td><td>Printer problem. See the printing entries above.</td></tr>
+        <tr><td><b>Manual entry → Print badge</b></td><td>Layout + printer. No internet needed.</td><td>Layout or paper size problem.</td></tr>
+        <tr><td><b>Search</b> for a guest</td><td>Connection, event and reading data from EventzFlow. Checks nobody in.</td><td>Connection or event setting problem.</td></tr>
+        <tr><td><b>Run checks</b> (above)</td><td>Everything in order, with advice.</td><td>Follow the advice on the red line.</td></tr>
+        <tr><td>A real <b>scan</b></td><td>The whole chain.</td><td>Read the message on screen.</td></tr>
+      </table></div>
+
+      <h3>Where to look</h3>
+      <ul>
+        <li><b>Activity log</b> — Settings → Station. Every scan, print and error is written here with the time: <code>scanning T-001…</code>, <code>printed + checked in: Name</code>, <code>scan failed: …</code>. Start here.</li>
+        <li><b>Recent</b> on the main screen shows each scan's outcome and, for failures, the reason.</li>
+        <li><b>Scan timing.</b> Each scan reports how long its steps took (lookup, check-in, print, total, in milliseconds). It is written to PrintDex's own log when it is started from a terminal. If <code>lookup</code> or <code>check_in</code> is slow, the network or EventzFlow is slow; if <code>print</code> is slow, the printer, driver or spooler is.</li>
+        <li><b>Status pages.</b> With PrintDex open, visit these in a browser on the same computer: <code>http://127.0.0.1:8000/health</code> (version and chosen printer), <code>/printers</code> (installed printers), <code>/config</code> (settings, key hidden), <code>/event</code> (which event is connected), <code>/update/status</code>.</li>
+        <li><b>Windows printing.</b> <em>Printers &amp; scanners → your printer → Open print queue</em> shows stuck or failed jobs. <em>Services → Print Spooler</em> can be restarted.</li>
+        <li><b>macOS printing.</b> In Terminal: <code>lpstat -p -d</code> (printers and default), <code>lpstat -o</code> (queued jobs). The CUPS page <code>http://localhost:631</code> shows each job's error.</li>
+      </ul>
+
+      <h3>When you ask for help</h3>
+      <p>Send: the <b>report</b> from the self-check ("Copy report"), a screenshot of the screen and of the Activity log, roughly <b>when</b> it happened, and the <b>ticket code</b> involved. That is usually enough to find the cause without anyone having to be at the station.</p>
+    </section>
+
+    <!-- ============ REFERENCE ============ -->
+    <section class="zone" id="reference">
+      <h2>Reference</h2>
+      <h3>Settings that live outside the window</h3>
+      <p>Set these as environment variables, or put them in a plain text file named <code>.env</code> in the same folder as the PrintDex program, one <code>NAME=value</code> per line. Restart PrintDex after changing them.</p>
+      <div class="table-wrap"><table class="simple">
+        <tr><th>Name</th><th>Default</th><th>What it does</th></tr>
+        <tr><td><code>PRINTER_NAME</code></td><td>automatic</td><td>The exact name of the printer to use. Automatic: the only printer, else the computer's default.</td></tr>
+        <tr><td><code>PORT</code></td><td><code>8000</code></td><td>The port the local address uses. RfiDex expects 8000.</td></tr>
+        <tr><td><code>HOST</code></td><td><code>127.0.0.1</code></td><td>Who may reach this station. Leave as is. <code>0.0.0.0</code> opens it to the whole venue network, and it has no login.</td></tr>
+        <tr><td><code>PRINT_DPI</code></td><td><code>203</code></td><td>macOS/Linux: the printer's resolution (203 or 300). Windows reads it from the driver.</td></tr>
+        <tr><td><code>HEADLESS</code></td><td>off</td><td>Any value: run without a window.</td></tr>
+      </table></div>
+
+      <h3>Where PrintDex keeps its settings</h3>
+      <p id="config-path">Windows: <code>%APPDATA%\printdex\config.json</code> · macOS: <code>~/Library/Application Support/printdex/config.json</code></p>
+      <p>The file holds the API key in plain text, readable only by the person who owns it. On a shared computer, use a separate user account for the event.</p>
+
+      <h3>Good habits</h3>
+      <ul>
+        <li>Run the self-check and a test print before doors open.</li>
+        <li>Keep a stack of spare label rolls and a spare printer cable at the desk.</li>
+        <li>If the printer jams, fix it and press <b>Retry print</b>; never rescan the guest.</li>
+        <li>Only the printer that PrintDex is using should be the computer's default, to avoid badges going to an office printer.</li>
+      </ul>
+    </section>
+
+    <p class="foot">PrintDex <span id="foot-version"></span> · <a href="/">Back to station</a></p>
+  </main>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  async function get(path) {
+    const r = await fetch(path);
+    let j = null;
+    try { j = await r.json(); } catch (e) { /* not JSON */ }
+    if (!r.ok) throw new Error((j && j.detail) || ("HTTP " + r.status));
+    return j;
+  }
+
+  // Each check returns { status: "ok" | "warn" | "fail", text, fix }.
+  const state = {};
+  const checks = [
+    { id: "station", title: "PrintDex is running", run: async () => {
+        const j = await get("/health");
+        state.version = j.version;
+        $("foot-version").textContent = j.version;
+        return { status: "ok", text: "Version " + j.version + "." };
+      },
+      fail: "Close PrintDex and open it again." },
+
+    { id: "printer", title: "Printer found", run: async () => {
+        const j = await get("/printers");
+        state.printer = j.configured_printer || "";
+        state.default = j.default_printer || "";
+        state.installed = j.printers || [];
+        if (!state.installed.length) return { status: "fail", text: "No printer is installed or connected.",
+          fix: "Connect and power the printer, install its driver, check it shows in the computer's printer list, then run the checks again." };
+        if (!state.printer) return { status: "fail", text: "Printers exist but none is chosen.",
+          fix: "Set the label printer as the computer's default printer, or set PRINTER_NAME (see Reference)." };
+        const others = state.installed.length > 1 ? " (" + state.installed.length + " printers installed" + (state.default ? ", default: " + state.default : "") + ")" : "";
+        return { status: "ok", text: "Printing to “" + state.printer + "”" + others + ".",
+          fix: state.installed.length > 1 ? "Make sure that is your label printer. If not, see “It prints, but on the wrong printer”." : "" };
+      } },
+
+    { id: "settings", title: "Event settings complete", run: async () => {
+        const j = await get("/config");
+        state.config = { url: j.backend_url, slug: j.event_slug, keySet: j.api_key_set, path: j.config_path };
+        if (j.config_path) $("config-path").innerHTML = "Your settings file: <code>" + esc(j.config_path) + "</code>";
+        const missing = [];
+        if (!j.backend_url) missing.push("Website address");
+        if (!j.event_slug) missing.push("Event ID or slug");
+        if (!j.api_key_set) missing.push("API key");
+        if (missing.length) return { status: "fail", text: "Missing: " + missing.join(", ") + ".",
+          fix: "Settings → Event: fill these in and press Save." };
+        let host = j.backend_url;
+        try { host = new URL(j.backend_url).host; } catch (e) { /* show as typed */ }
+        state.host = host;
+        return { status: "ok", text: "Server " + host + ", event “" + j.event_slug + "”, API key set." };
+      } },
+
+    { id: "event", title: "Event found on EventzFlow", run: async () => {
+        if (!state.config || !state.config.url || !state.config.slug) return { status: "warn", text: "Skipped: event settings are incomplete." };
+        const j = await get("/event");
+        state.event = j;
+        return { status: "ok", text: j.title + " (ID " + j.id + ", slug " + j.slug + ")." };
+      },
+      fail: "Check the Website address and the event ID or slug (Settings → Event). See “Event not found” and “Network error” below." },
+
+    { id: "key", title: "API key accepted", run: async () => {
+        if (!state.config || !state.config.keySet || !state.event) return { status: "warn", text: "Skipped: the event wasn't reached." };
+        try {
+          const j = await get("/ticket-groups");
+          return { status: "ok", text: j.enabled ? "Accepted. This event uses ticket groups (" + j.groups.length + ")." : "Accepted." };
+        } catch (e) {
+          const msg = String(e.message || e);
+          // A refused key and a backend that errored need different advice.
+          return /not authorized/i.test(msg)
+            ? { status: "fail", text: msg, fix: "Enter the event's API key again in Settings → Event and press Save. See “Not authorized”." }
+            : { status: "fail", text: msg, fix: "EventzFlow answered with an error rather than refusing the key. Wait a moment and run the checks again; if it repeats, tell your EventzFlow admin. See “Lookup failed”." };
+        }
+      } },
+
+    { id: "update", title: "Updates", run: async () => {
+        const j = await get("/update/status");
+        state.update = j;
+        if (!j.update_supported) return { status: "warn", text: "Version " + j.current_version + ". Self-update is off in this build.",
+          fix: "Fine for testing. For event stations, install the signed release." };
+        return { status: "ok", text: "Version " + j.current_version + ". Updates are enabled." };
+      } },
+  ];
+
+  const MARK = { ok: "✓", warn: "!", fail: "✕", run: "…" };
+
+  function row(c) {
+    const el = document.createElement("div");
+    el.className = "check-row";
+    el.id = "check-" + c.id;
+    el.innerHTML = '<span class="mark">…</span><div><div class="t"></div><div class="m"></div></div>';
+    el.querySelector(".t").textContent = c.title;
+    return el;
+  }
+
+  function show(c, result) {
+    const el = $("check-" + c.id);
+    el.className = "check-row " + result.status;
+    el.querySelector(".mark").textContent = MARK[result.status];
+    el.querySelector(".m").textContent = result.text;
+    const old = el.querySelector(".f");
+    if (old) old.remove();
+    const advice = result.fix || (result.status === "fail" ? c.fail : "");
+    if (advice) {
+      const f = document.createElement("div");
+      f.className = "f";
+      f.textContent = (result.status === "fail" ? "What to do: " : "Note: ") + advice;
+      el.appendChild(f);
+    }
+    c.result = result;
+  }
+
+  async function runChecks() {
+    const btn = $("run-checks");
+    btn.disabled = true;
+    $("check-summary").textContent = "";
+    $("check-list").replaceChildren(...checks.map(row));
+    for (const k of Object.keys(state)) delete state[k];
+    for (const c of checks) {
+      let result;
+      try { result = await c.run(); }
+      catch (e) { result = { status: "fail", text: String(e.message || e) }; }
+      show(c, result);
+    }
+    const fails = checks.filter((c) => c.result.status === "fail").length;
+    const warns = checks.filter((c) => c.result.status === "warn").length;
+    const summary = $("check-summary");
+    summary.style.color = fails ? "var(--err)" : warns ? "var(--warn)" : "var(--ok)";
+    summary.textContent = fails ? fails + " problem" + (fails > 1 ? "s" : "") + " found. Follow the “What to do” lines, then run the checks again."
+      : warns ? "Ready, with " + warns + " note" + (warns > 1 ? "s" : "") + " above."
+      : "All good. This station is ready.";
+    btn.disabled = false;
+    btn.textContent = "Run checks again";
+    buildReport();
+  }
+
+  function buildReport() {
+    const lines = ["PrintDex report", "Time: " + new Date().toString(), "Page: " + location.origin,
+      "Computer: " + navigator.userAgent, ""];
+    for (const c of checks) {
+      if (!c.result) continue;
+      lines.push((MARK[c.result.status] + " " + c.title + ": " + c.result.text).trim());
+    }
+    if (state.installed) lines.push("", "Printers installed: " + (state.installed.join(", ") || "none"));
+    if (state.config && state.config.path) lines.push("Settings file: " + state.config.path);
+    const text = lines.join("\n");
+    $("report").value = text;
+    return text;
+  }
+
+  $("run-checks").addEventListener("click", runChecks);
+
+  $("copy-report").addEventListener("click", async () => {
+    if (!checks.some((c) => c.result)) await runChecks();
+    const text = buildReport();
+    const box = $("report");
+    box.hidden = false;
+    try { await navigator.clipboard.writeText(text); $("copy-report").textContent = "Copied ✓"; }
+    catch (e) { box.select(); $("copy-report").textContent = "Select and copy below"; }
+    setTimeout(() => { $("copy-report").textContent = "Copy report"; }, 2500);
+  });
+
+  $("print-test").addEventListener("click", async () => {
+    const out = $("print-result");
+    const btn = $("print-test");
+    btn.disabled = true;
+    out.hidden = false;
+    out.className = "note";
+    out.textContent = "Sending a test page…";
+    try {
+      const r = await fetch("/print-test", { method: "POST" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+      out.textContent = "Sent to “" + (j.target_printer || "the printer") + "”. A bordered page with the time should come out. If nothing prints, see “Printing” below.";
+    } catch (e) {
+      out.className = "note warn";
+      out.textContent = String(e.message || e) + " — see the printing entries in “Something went wrong”.";
+    }
+    btn.disabled = false;
+  });
+
+  // Fill the version in the footer without running the full check.
+  get("/health").then((j) => { $("foot-version").textContent = j.version; }).catch(() => {});
+
+  // A link like /help#some-id opens that entry if it is a collapsed one.
+  if (location.hash) {
+    const target = document.querySelector(location.hash);
+    if (target && target.tagName === "DETAILS") target.open = true;
+  }
+})();
+</script>
+</body>
+</html>

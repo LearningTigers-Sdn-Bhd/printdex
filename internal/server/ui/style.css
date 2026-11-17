@@ -205,8 +205,13 @@
   }
   .search-row .sr-main { flex: 1; min-width: 0; }
   .search-row .sr-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .search-row .sr-meta { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .search-row .sr-meta { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; } /* wraps: the matched email or phone must stay visible */
   .search-row .sr-in { color: var(--warn); font-weight: 600; }
+  .search-results { transition: opacity 120ms; }
+  .search-results.loading { opacity: .55; }
+  .search-results .sr-head { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: .02em; padding: 2px 2px 0; }
+  .search-row:focus-within { border-color: var(--accent); }
+  mark.sr-hit { background: var(--accent-soft); color: inherit; border-radius: 2px; padding: 0 1px; }
   #scan-input {
     height: 46px; padding: 0 12px 0 40px;
     font-family: var(--font-mono); font-size: 16px; font-weight: 500;
@@ -235,7 +240,8 @@
   .last-state.err { color: var(--err); }
   .last-state.skip { color: var(--ink-soft); }
   .last-time {
-    margin-left: auto; font-family: var(--font-mono); font-size: 12px; font-weight: 450;
+    margin-left: auto; flex: none; white-space: nowrap; /* a time never splits from its AM/PM */
+    font-family: var(--font-mono); font-size: 12px; font-weight: 450;
     color: var(--faint); font-variant-numeric: tabular-nums;
   }
   .last-name {
@@ -294,25 +300,28 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .feed-row .r-ts {
-    grid-column: 3; grid-row: 1; font-family: var(--font-mono); font-size: 12px;
+    grid-column: 3; grid-row: 1; font-family: var(--font-mono); font-size: 12px; white-space: nowrap;
     color: var(--faint); font-variant-numeric: tabular-nums;
   }
   .feed-row .r-meta {
     grid-column: 1 / 4; font-family: var(--font-mono); font-size: 12px; color: var(--muted);
-    display: flex; align-items: center; gap: 8px; min-width: 0;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0;
   }
-  /* State word + metadata text may shrink/ellipsis… */
-  .feed-row .r-state { font-family: var(--font-ui); font-weight: 600; font-size: 12px; flex-shrink: 0; }
+  /* Line one: the state word and the button. Line two: the details, in full.
+     Nothing is allowed to push past the row's edge: the state word wraps, the
+     button drops to its own line when there is no room beside it, and long
+     details wrap instead of being cut off… */
+  .feed-row .r-state { order: 1; font-family: var(--font-ui); font-weight: 600; font-size: 12px; min-width: 0; }
   .feed-row .r-meta > span:not(.r-state) {
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 auto;
+    order: 3; flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere;
   }
   .feed-row.ok .r-state { color: var(--ok); }
   .feed-row.warn .r-state { color: var(--warn); }
   .feed-row.err .r-state { color: var(--err); }
   .feed-row.skip .r-state { color: var(--ink-soft); }
-  /* …but the Reprint button is pinned so it never clips off the row */
+  /* …and the Reprint button keeps its full size, right-aligned */
   .feed-row .r-reprint {
-    flex-shrink: 0; margin-left: auto; padding: 2px 9px; box-shadow: none;
+    order: 2; flex: none; margin-left: auto; min-width: 68px; padding: 3px 10px; box-shadow: none; text-align: center;
     font-size: 11.5px; font-weight: 600; color: var(--accent);
     background: none; border: 1px solid var(--accent); border-radius: 6px;
     cursor: pointer; width: auto; height: auto; line-height: 1.4;
@@ -406,6 +415,10 @@
   form { display: grid; gap: 12px; }
   label { display: grid; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
   label .hint { font-weight: 400; color: var(--muted); font-size: 12px; }
+  .field-status { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+  .field-status:empty { display: none; }
+  .field-status.ok { color: var(--ok); }
+  .field-status.err { color: var(--err); }
   input, select {
     background: var(--panel-2); color: var(--ink);
     border: 1px solid var(--line-strong); border-radius: 9px;

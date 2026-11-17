@@ -81,3 +81,28 @@ func TestTicketGroupsDisabledIsNotAnError(t *testing.T) {
 		t.Errorf("enabled=%v groups=%v err=%v calls=%d", enabled, groups, err, calls)
 	}
 }
+
+func TestEventResolvesByIDOrSlugAndReportsUnknown(t *testing.T) {
+	var asked []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = append(asked, r.URL.Path)
+		if !strings.Contains(r.URL.Path, "/events/12/") && !strings.Contains(r.URL.Path, "/events/expo/") {
+			w.WriteHeader(404)
+			return
+		}
+		w.Write([]byte(`{"data":{"id":12,"title":"Tech Expo","slug":"expo"}}`))
+	}))
+	defer server.Close()
+	for _, entered := range []string{"12", "expo"} {
+		event, err := New(config.Config{BackendURL: server.URL, EventSlug: entered}).Event()
+		if err != nil || event.ID != "12" || event.Title != "Tech Expo" || event.Slug != "expo" {
+			t.Errorf("entered %q: %+v, %v", entered, event, err)
+		}
+	}
+	if _, err := New(config.Config{BackendURL: server.URL, EventSlug: "nope"}).Event(); err != errEventNotFound {
+		t.Errorf("unknown event: %v", err)
+	}
+	if len(asked) != 3 || !strings.HasSuffix(asked[0], "/events/12/check_in") {
+		t.Errorf("requests = %v", asked)
+	}
+}

@@ -49,6 +49,8 @@ func fakeEventzFlow() *httptest.Server {
 				"public_id": id, "attendee_name": "Aisha Tan", "ticket_type": ticketType,
 				"ticket_group":       map[string]any{"id": 3, "name": "Room A"},
 				"custom_fields_data": map[string]any{"organisation": "Acme", "Sponsor Tier": "Gold"}}})
+		case r.Method == "GET" && strings.HasSuffix(r.URL.Path, "/check_in"):
+			reply(w, 200, map[string]any{"data": map[string]any{"id": 12, "title": "Tech Expo", "slug": "expo"}})
 		case r.Method != "PATCH":
 			reply(w, 404, nil)
 		case r.Header.Get("Authorization") != "key":
@@ -157,6 +159,36 @@ func TestRebindingHostIsRefused(t *testing.T) {
 	app.Handler().ServeHTTP(rec, req)
 	if rec.Code != 200 {
 		t.Errorf("network mode refused a LAN host: HTTP %d", rec.Code)
+	}
+}
+
+func TestEventAndHelpPages(t *testing.T) {
+	backend := fakeEventzFlow()
+	defer backend.Close()
+	store := config.Open(filepath.Join(t.TempDir(), "config.json"))
+	app := httptest.NewServer((&App{Store: store, Printer: &fakePrinter{}, Updater: update.New("dev", "")}).Handler())
+	defer app.Close()
+
+	get := func(path string) (int, map[string]any) {
+		resp, err := http.Get(app.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var body map[string]any
+		json.NewDecoder(resp.Body).Decode(&body)
+		return resp.StatusCode, body
+	}
+	if code, _ := get("/event"); code != 400 {
+		t.Errorf("unconnected station: HTTP %d, want 400", code)
+	}
+	id := "12" // an event ID works wherever a slug does
+	store.Save(config.Patch{BackendURL: &backend.URL, EventSlug: &id})
+	if code, body := get("/event"); code != 200 || body["title"] != "Tech Expo" || body["slug"] != "expo" {
+		t.Errorf("event: HTTP %d %v", code, body)
+	}
+	if resp, err := http.Get(app.URL + "/help"); err != nil || resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "text/html; charset=utf-8" {
+		t.Errorf("help page: %v %v", resp, err)
 	}
 }
 

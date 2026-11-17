@@ -44,7 +44,13 @@ type AlreadyCheckedIn struct {
 
 func (e *AlreadyCheckedIn) Error() string { return e.Message }
 
-// Client reaches one event on one backend.
+// errEventNotFound is what every lookup says when the backend doesn't know the
+// event the station was given.
+var errEventNotFound = Error("Event not found. Check the event ID or slug.")
+
+// Client reaches one event on one backend. The event is named by its numeric ID
+// or its slug, whichever the operator entered: the backend accepts both in the
+// same place of the address.
 type Client struct {
 	baseURL string
 	slug    string
@@ -106,6 +112,34 @@ func (c *Client) send(method, path string, payload any, withKey bool) (response,
 
 func (c *Client) eventPath(suffix string) string {
 	return "/v1/public/events/" + url.PathEscape(c.slug) + suffix
+}
+
+// EventInfo identifies an event.
+type EventInfo struct {
+	ID    ticket.Text `json:"id"`
+	Title ticket.Text `json:"title"`
+	Slug  ticket.Text `json:"slug"`
+}
+
+// Event looks up the connected event, which shows the operator what the ID or
+// slug they entered points to.
+func (c *Client) Event() (EventInfo, error) {
+	resp, err := c.send("GET", c.eventPath("/check_in"), nil, false)
+	switch {
+	case err != nil:
+		return EventInfo{}, err
+	case resp.status == 404:
+		return EventInfo{}, errEventNotFound
+	case resp.status >= 400:
+		return EventInfo{}, Error(fmt.Sprintf("Event lookup failed (%d): %s", resp.status, resp.excerpt()))
+	}
+	var reply struct {
+		Data EventInfo `json:"data"`
+	}
+	if !resp.decode(&reply) || reply.Data.ID == "" {
+		return EventInfo{}, Error("The backend sent event details this app can't read.")
+	}
+	return reply.Data, nil
 }
 
 // TicketData is a ticket as the backend describes it.
@@ -198,7 +232,7 @@ func (c *Client) TicketTypes() ([]string, error) {
 	case err != nil:
 		return nil, err
 	case resp.status == 404:
-		return nil, Error("Event not found. Check the event name (slug).")
+		return nil, errEventNotFound
 	case resp.status >= 400:
 		return nil, Error(fmt.Sprintf("Ticket type lookup failed (%d): %s", resp.status, resp.excerpt()))
 	}
@@ -217,21 +251,13 @@ func (c *Client) TicketGroups() (enabled bool, groups []string, err error) {
 	if c.apiKey == "" {
 		return false, nil, Error("API key is not configured.")
 	}
-	// The group list is keyed by numeric event id, which the public
-	// check-in info provides.
-	info, err := c.send("GET", c.eventPath("/check_in"), nil, false)
+	// The group list is keyed by the numeric event id, which the event's
+	// public info provides.
+	event, err := c.Event()
 	if err != nil {
 		return false, nil, err
 	}
-	var event struct {
-		Data struct {
-			ID ticket.Text `json:"id"`
-		} `json:"data"`
-	}
-	if info.status >= 400 || !info.decode(&event) || event.Data.ID == "" {
-		return false, nil, Error("Event not found. Check the event name (slug).")
-	}
-	resp, err := c.send("GET", "/v1/events/"+url.PathEscape(string(event.Data.ID))+"/ticket_groups", nil, true)
+	resp, err := c.send("GET", "/v1/events/"+url.PathEscape(string(event.ID))+"/ticket_groups", nil, true)
 	if err != nil {
 		return false, nil, err
 	}
@@ -268,7 +294,7 @@ func (c *Client) Search(method, value string) ([]json.RawMessage, error) {
 	resp.decode(&reply)
 	switch {
 	case resp.status == 404 && strings.Contains(strings.ToLower(reply.Message), "event"):
-		return nil, Error("Event not found. Check the event name (slug).")
+		return nil, errEventNotFound
 	case resp.status == 404:
 		return []json.RawMessage{}, nil // no guest matches
 	case resp.status >= 400:

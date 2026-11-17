@@ -108,6 +108,9 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(w, r, dashboard, "index.html")
 	})
+	mux.HandleFunc("GET /help", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(w, r, dashboard, "help.html")
+	})
 
 	for pattern, handler := range map[string]endpoint{
 		"GET /health":          a.health,
@@ -128,6 +131,7 @@ func (a *App) Handler() http.Handler {
 		"POST /print-test":   a.printTest,
 		"POST /print-ticket": a.printTicket,
 
+		"GET /event":         a.eventInfo,
 		"GET /ticket-types":  a.ticketTypes,
 		"GET /ticket-groups": a.ticketGroups,
 		"GET /search":        a.search,
@@ -340,6 +344,20 @@ func (a *App) event(needsKey bool) (config.Config, *eventzflow.Client, error) {
 		return cfg, nil, errNotConnected
 	}
 	return cfg, eventzflow.New(cfg), nil
+}
+
+// eventInfo says which event the station is connected to, so the operator can
+// confirm that the ID or slug they entered points where they meant.
+func (a *App) eventInfo(*http.Request) (any, error) {
+	_, client, err := a.event(false)
+	if err != nil {
+		return nil, err
+	}
+	info, err := client.Event()
+	if err != nil {
+		return nil, upstream(err)
+	}
+	return map[string]any{"ok": true, "id": info.ID, "title": info.Title, "slug": info.Slug}, nil
 }
 
 func (a *App) ticketTypes(*http.Request) (any, error) {
