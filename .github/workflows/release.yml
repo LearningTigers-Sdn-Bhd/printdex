@@ -1,0 +1,142 @@
+name: Release
+
+# Every push and PR: test, then build both platforms (artifacts only), so a
+# broken build never reaches a tag.
+# On a version tag (v*): also sign the builds and publish the GitHub Release
+# with latest.json, which installed copies read to update themselves.
+#
+# Release flow: git tag v1.2.3 && git push origin v1.2.3
+#
+# One-time setup (run `go run . keygen` locally):
+#   repository variable UPDATE_PUBLIC_KEY   baked into every build
+#   repository secret   UPDATE_PRIVATE_KEY  signs release builds
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # create the release on tags
+
+env:
+  WAILS_VERSION: v2.17.1 # keep in step with go.mod
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./... && GOOS=windows go vet ./... && GOOS=darwin go vet ./...
+      - run: go test ./...
+
+  build:
+    needs: test
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows, os: windows-latest }
+          - { name: macos, os: macos-latest }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+
+      - name: Version
+        id: v
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then V="${GITHUB_REF_NAME#v}"; else V="0.0.0"; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          # The installer's version comes from wails.json.
+          sed -i.bak "s/\"productVersion\": \"[^\"]*\"/\"productVersion\": \"$V\"/" wails.json
+          echo "ldflags=-X main.version=$V -X main.updatePublicKey=${{ vars.UPDATE_PUBLIC_KEY }}" >> "$GITHUB_OUTPUT"
+
+      # Windows: per-user NSIS installer (no admin prompt) with the WebView2
+      # bootstrapper embedded, plus the bare exe the updater downloads.
+      - name: Build (Windows)
+        if: matrix.name == 'windows'
+        shell: bash
+        run: |
+          command -v makensis >/dev/null || choco install nsis -y
+          wails build -clean -s -nsis -installscope user -webview2 embed -ldflags "${{ steps.v.outputs.ldflags }}"
+          mkdir dist
+          cp build/bin/*-installer.exe "dist/PrintDex_${{ steps.v.outputs.version }}_x64-setup.exe"
+          cp build/bin/printdex.exe dist/printdex-windows-amd64.exe
+
+      # macOS: universal .app in a drag-to-Applications disk image, plus the
+      # bare binary the updater downloads.
+      - name: Build (macOS)
+        if: matrix.name == 'macos'
+        run: |
+          wails build -clean -s -platform darwin/universal -ldflags "${{ steps.v.outputs.ldflags }}"
+          APP=$(ls -d build/bin/*.app)
+          mkdir dist stage
+          cp "$APP"/Contents/MacOS/* dist/printdex-darwin-universal
+          cp -R "$APP" stage/ && ln -s /Applications stage/Applications
+          hdiutil create -volname PrintDex -srcfolder stage -ov -format UDZO \
+            "dist/PrintDex_${{ steps.v.outputs.version }}_universal.dmg"
+
+      - name: Smoke test (health endpoint)
+        shell: bash
+        run: |
+          BIN=$(ls dist/printdex-*)
+          chmod +x "$BIN"
+          HEADLESS=1 PORT=8399 "$BIN" & PID=$!
+          for i in $(seq 1 30); do
+            curl -fs http://127.0.0.1:8399/health | grep -q '"ok":true' && { kill $PID; echo "health OK"; exit 0; }
+            sleep 1
+          done
+          kill $PID; echo "health check failed"; exit 1
+
+      - name: Sign update binaries
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          UPDATE_PRIVATE_KEY: ${{ secrets.UPDATE_PRIVATE_KEY }}
+        run: |
+          for f in dist/printdex-*; do go run . sign "$f" > "$f.sig"; done
+          (cd dist && shasum -a 256 * > "SHA256SUMS-${{ matrix.name }}.txt")
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: printdex-${{ matrix.name }}
+          path: dist/
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish release with latest.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          WIN=$(cat dist/printdex-windows-amd64.exe.sig)
+          MAC=$(cat dist/printdex-darwin-universal.sig)
+          jq -n --arg v "$V" --arg base "$BASE" --arg win "$WIN" --arg mac "$MAC" '{
+            version: $v,
+            platforms: {
+              "windows-amd64": {url: ($base + "/printdex-windows-amd64.exe"), signature: $win},
+              "darwin-arm64":  {url: ($base + "/printdex-darwin-universal"),  signature: $mac},
+              "darwin-amd64":  {url: ($base + "/printdex-darwin-universal"),  signature: $mac}
+            }}' > dist/latest.json
+          rm dist/*.sig
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --title "PrintDex $V" --generate-notes

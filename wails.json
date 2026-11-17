@@ -1,0 +1,17 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "PrintDex",
+  "outputfilename": "printdex",
+  "frontend:install": "",
+  "frontend:build": "",
+  "author": {
+    "name": "Learning Tigers Sdn Bhd"
+  },
+  "info": {
+    "companyName": "Learning Tigers Sdn Bhd",
+    "productName": "PrintDex",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright Learning Tigers Sdn Bhd",
+    "comments": "Event badge and sticker printing station"
+  }
+}
