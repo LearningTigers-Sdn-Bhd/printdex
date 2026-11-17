@@ -39,6 +39,7 @@ jobs:
     needs: test
     name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30 # a hung build should fail fast, not run for an hour
     strategy:
       fail-fast: false
       matrix:
@@ -62,6 +63,9 @@ jobs:
           sed -i.bak "s/\"productVersion\": \"[^\"]*\"/\"productVersion\": \"$V\"/" wails.json
           echo "ldflags=-X main.version=$V -X main.updatePublicKey=${{ vars.UPDATE_PUBLIC_KEY }}" >> "$GITHUB_OUTPUT"
 
+      # -skipbindings: the dashboard talks to the app over HTTP, so there are no
+      # JavaScript bindings to generate. Without it Wails runs the app to read
+      # them, and the app (a server) never exits, so the build hangs.
       # Windows: per-user NSIS installer (no admin prompt) with the WebView2
       # bootstrapper embedded, plus the bare exe the updater downloads.
       - name: Build (Windows)
@@ -69,7 +73,7 @@ jobs:
         shell: bash
         run: |
           command -v makensis >/dev/null || choco install nsis -y
-          wails build -clean -s -nsis -installscope user -webview2 embed -ldflags "${{ steps.v.outputs.ldflags }}"
+          wails build -clean -s -skipbindings -nsis -installscope user -webview2 embed -ldflags "${{ steps.v.outputs.ldflags }}"
           mkdir dist
           cp build/bin/*-installer.exe "dist/PrintDex_${{ steps.v.outputs.version }}_x64-setup.exe"
           cp build/bin/printdex.exe dist/printdex-windows-amd64.exe
@@ -79,7 +83,7 @@ jobs:
       - name: Build (macOS)
         if: matrix.name == 'macos'
         run: |
-          wails build -clean -s -platform darwin/universal -ldflags "${{ steps.v.outputs.ldflags }}"
+          wails build -clean -s -skipbindings -platform darwin/universal -ldflags "${{ steps.v.outputs.ldflags }}"
           APP=$(ls -d build/bin/*.app)
           mkdir dist stage
           cp "$APP"/Contents/MacOS/* dist/printdex-darwin-universal
