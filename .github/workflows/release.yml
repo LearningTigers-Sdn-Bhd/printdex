@@ -147,5 +147,18 @@ jobs:
               "darwin-amd64":  {url: ($base + "/printdex-darwin-universal"),  signature: $mac}
             }}' > dist/latest.json
           rm dist/*.sig
+          cat > notes.md <<'EOF'
+          Badge and sticker printing station for EventzFlow events. Scan a guest's QR code, check them in and print their badge.
+
+          ### Download
+          | Platform | File |
+          |---|---|
+          | Windows | `PrintDex_*_x64-setup.exe` (installs per user, no admin prompt) |
+          | macOS | `PrintDex_*_universal.dmg` (Apple Silicon and Intel) |
+
+          Installed copies update themselves. `printdex-*` binaries, `latest.json` and `SHA256SUMS-*.txt` are for the updater and for checking downloads. Most people only need the installer.
+
+          Run a **Test print** on each new station before the event.
+          EOF
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
-            --title "PrintDex $V" --generate-notes
+            --title "PrintDex $V" --notes-file notes.md --generate-notes
