@@ -27,7 +27,7 @@ import (
 	"time"
 )
 
-const repo = "Sienz16/printdex"
+const repo = "LearningTigers-Sdn-Bhd/printdex"
 
 var (
 	releasePage = "https://github.com/" + repo + "/releases/latest"
