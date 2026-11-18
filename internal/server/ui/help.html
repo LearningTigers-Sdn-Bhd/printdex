@@ -15,15 +15,61 @@
 </script>
 <link rel="stylesheet" href="/static/style.css" />
 <style>
-  main.help { display: block; max-width: 920px; }
-  .help h1 { margin: 0 0 6px; font-size: clamp(28px, 4vw, 40px); font-weight: 730; letter-spacing: -.045em; line-height: 1.1; }
-  .help .lede { margin: 0 0 18px; color: var(--muted); font-size: 14.5px; }
-  .help .zone { margin-bottom: 16px; padding: 18px 20px; scroll-margin-top: 84px; }
-  .help h2 { margin: 0 0 10px; font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
-  .help h3 { margin: 18px 0 6px; font-size: 14px; font-weight: 700; }
-  .help p { margin: 6px 0; }
-  .help ul, .help ol { margin: 6px 0; padding-left: 22px; }
-  .help li { margin: 4px 0; }
+  .help-page { background: var(--panel); --help-anchor: 90px; }
+  .help-page .topbar { padding-inline: max(clamp(20px, 4vw, 48px), calc((100% - 1184px) / 2)); }
+  main.help {
+    grid-template-columns: 212px minmax(0, 1fr);
+    grid-template-areas: "nav intro" "nav shortcuts" "nav content"; gap: 0 clamp(28px, 4vw, 56px);
+    max-width: 1280px; padding: 40px clamp(20px, 4vw, 48px) 36px;
+    font-size: 15px; line-height: 1.65;
+  }
+  .help-nav {
+    grid-area: nav; position: sticky; top: 96px; max-height: calc(100vh - 112px); overflow: auto;
+    border-right: 1px solid var(--line); padding: 6px 20px 12px 3px;
+  }
+  .help-nav-label {
+    display: block; margin: 0 0 6px 14px; color: var(--muted);
+    font-size: 11px; font-weight: 750; letter-spacing: .09em; text-transform: uppercase;
+  }
+  .help .toc { list-style: none; display: grid; gap: 3px; margin: 0; padding: 0; }
+  .help .toc + .help-nav-label { margin-top: 24px; }
+  .help .toc li { margin: 0; }
+  .help .toc a {
+    display: block; padding: 8px 12px; border-radius: 8px; color: var(--ink-soft); border-left: 2px solid transparent;
+    font-size: 14px; font-weight: 570; text-decoration: none;
+  }
+  .help .toc a:hover { background: var(--panel-2); color: var(--accent); }
+  .help .toc a[aria-current="location"] { background: var(--accent-soft); color: var(--accent); border-left-color: currentColor; font-weight: 700; }
+  .help-hero {
+    grid-area: intro; min-width: 0; overflow: hidden;
+    display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: center; gap: 10px;
+    padding: clamp(26px, 4vw, 50px); border: 1px solid #574277; border-radius: 22px;
+    background: radial-gradient(ellipse at 93% 25%, #50327d, transparent 65%), #211832;
+    color: #fff;
+  }
+  .help h1 { margin: 0; font-size: clamp(38px, 5.4vw, 70px); font-weight: 750; letter-spacing: -.06em; line-height: .99; }
+  .help .lede { max-width: 36ch; margin: 16px 0 0; color: #e3d7f6; font-size: clamp(15px, 2vw, 18px); }
+  .help-hero img {
+    display: block; width: 100%; max-width: 290px; height: auto; justify-self: end;
+    filter: drop-shadow(0 16px 22px #130a26a3);
+  }
+  .help-content { grid-area: content; min-width: 0; }
+  .help-shortcuts { grid-area: shortcuts; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+  .help .help-shortcuts a {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: start; gap: 3px 8px;
+    padding: 16px; border: 1px solid var(--line); border-radius: 13px;
+    background: var(--panel-2); color: var(--ink); text-decoration: none;
+  }
+  .help-shortcuts a:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .help-shortcuts strong { font-size: 15px; line-height: 1.35; }
+  .help-shortcuts small { grid-column: 1 / -1; color: var(--muted); font-size: 13px; line-height: 1.4; }
+  .help-shortcuts .arrow { color: var(--accent); line-height: 1.35; }
+  .help .topic { padding: 32px 0; border-bottom: 1px solid var(--line); scroll-margin-top: var(--help-anchor); }
+  .help h2 { margin: 0 0 16px; font-size: clamp(23px, 3vw, 30px); font-weight: 730; letter-spacing: -.035em; line-height: 1.2; }
+  .help h3 { margin: 24px 0 6px; font-size: 17px; font-weight: 700; letter-spacing: -.015em; }
+  .help p { margin: 8px 0; }
+  .help ul, .help ol { margin: 8px 0; padding-left: 22px; }
+  .help li { margin: 5px 0; }
   .help code, .help kbd {
     font-family: var(--font-mono); font-size: 12px; padding: 1px 5px; border-radius: 5px;
     background: var(--panel-2); border: 1px solid var(--line); overflow-wrap: anywhere;
@@ -32,29 +78,31 @@
   .help a { color: var(--accent); }
   .back { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--line);
     border-radius: 9px; background: var(--panel); color: var(--accent); font-weight: 600; text-decoration: none; }
-  .help ul.toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; padding: 0; list-style: none; }
-  .toc a { display: inline-block; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px;
-    background: var(--panel); color: var(--ink-soft); font-weight: 600; font-size: 12.5px; text-decoration: none; }
-  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .back:hover { background: var(--accent-soft); }
 
-  ol.steps { list-style: none; counter-reset: step; padding: 0; }
-  ol.steps > li { counter-increment: step; position: relative; margin: 0 0 12px; padding-left: 40px; }
-  ol.steps > li::before {
-    content: counter(step); position: absolute; left: 0; top: 0; width: 27px; height: 27px; display: grid; place-items: center;
-    border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px;
+  .help .steps { list-style: none; counter-reset: step; padding: 4px 0 0; }
+  .steps > li { counter-increment: step; position: relative; margin: 0; padding: 0 0 22px 49px; }
+  .steps > li:last-child { padding-bottom: 0; }
+  .steps > li:not(:last-child)::after {
+    content: ""; position: absolute; top: 34px; bottom: 3px; left: 15px; border-left: 1px solid var(--line-strong);
   }
-  ol.steps > li > strong:first-child { display: block; }
+  .steps > li::before {
+    content: counter(step); position: absolute; left: 0; top: 0; width: 31px; height: 31px; display: grid; place-items: center;
+    border-radius: 9px; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px;
+  }
+  .steps > li > strong:first-child { display: block; margin-bottom: 3px; font-size: 16px; }
   .note { margin: 10px 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
   .note.warn { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--panel)); }
-  table.simple { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
-  table.simple th, table.simple td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
-  table.simple th { color: var(--muted); font-size: 12px; font-weight: 600; }
-  .table-wrap { overflow-x: auto; }
+  table.simple { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 14px; }
+  table.simple th, table.simple td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  table.simple th { color: var(--muted); background: var(--panel-2); font-size: 13px; font-weight: 700; }
+  table.simple tr:last-child td { border-bottom: 0; }
+  .table-wrap { overflow-x: auto; margin: 12px 0; border: 1px solid var(--line); border-radius: 12px; }
 
   details.fix { border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; background: var(--panel); }
-  details.fix > summary { cursor: pointer; padding: 10px 14px; font-weight: 600; list-style: none; display: flex; gap: 10px; align-items: baseline; }
+  details.fix > summary { position: relative; cursor: pointer; padding: 12px 14px 12px 34px; font-weight: 600; list-style: none; }
   details.fix > summary::-webkit-details-marker { display: none; }
-  details.fix > summary::before { content: "▸"; color: var(--muted); transition: transform .12s; flex: none; }
+  details.fix > summary::before { content: "▸"; position: absolute; left: 14px; color: var(--muted); transition: transform .12s; }
   details.fix[open] > summary::before { transform: rotate(90deg); }
   details.fix > summary:hover { color: var(--accent); }
   details.fix .body { padding: 0 14px 12px 34px; }
@@ -73,10 +121,29 @@
   .check-row .f { grid-column: 2; color: var(--muted); }
   .check-summary { margin: 10px 0 0; font-weight: 650; }
   textarea.report { width: 100%; min-height: 150px; margin-top: 8px; font-family: var(--font-mono); font-size: 12px; }
-  .foot { color: var(--muted); font-size: 12.5px; text-align: center; padding: 8px 0 30px; }
+  .foot { color: var(--muted); font-size: 13px; padding-top: 12px; }
+
+  @media (max-width: 760px) {
+    main.help { grid-template-columns: minmax(0, 1fr); grid-template-areas: "intro" "shortcuts" "nav" "content"; gap: 16px; padding-top: 20px; }
+    .help-shortcuts { margin-top: 0; }
+    .help-nav { position: static; max-height: none; overflow: visible; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+    .help-nav-label { margin: 0 0 6px 10px; }
+    .help .toc + .help-nav-label { margin-top: 12px; }
+    .help .toc { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .help .toc a { padding: 7px 10px; }
+  }
+  @media (max-width: 640px) {
+    .help-page { --help-anchor: 16px; }
+  }
+  @media (max-width: 500px) {
+    .help-hero { grid-template-columns: minmax(0, 1fr); gap: 0; padding-bottom: 15px; }
+    .help-hero img { max-width: 152px; justify-self: center; }
+    .help-shortcuts { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .help .help-shortcuts a { padding: 12px 14px; }
+  }
 </style>
 </head>
-<body>
+<body class="help-page">
   <header class="topbar">
     <div class="brand">
       <div class="brand-mark" aria-hidden="true">P</div>
@@ -89,23 +156,45 @@
   </header>
 
   <main class="help">
-    <h1>How to use PrintDex</h1>
-    <p class="lede">Scan a guest's ticket, they are checked in on EventzFlow, and their badge prints. This page covers setup, daily use, and what to do when something goes wrong.</p>
+    <div class="help-hero">
+      <div>
+        <h1>PrintDex<br />help center</h1>
+        <p class="lede">Set up your station, check guests in on EventzFlow, and troubleshoot badge printing.</p>
+      </div>
+      <img src="/static/help-printer.webp" width="640" height="640" alt="" />
+    </div>
 
-    <ul class="toc">
-      <li><a href="#start">Set up</a></li>
-      <li><a href="#daily">Daily use</a></li>
-      <li><a href="#layout">Badge layout</a></li>
-      <li><a href="#selfcheck">Self-check</a></li>
-      <li><a href="#fix">Fix a problem</a></li>
-      <li><a href="#investigate">Investigate</a></li>
-      <li><a href="#reference">Reference</a></li>
-    </ul>
+    <nav class="help-shortcuts" aria-label="Common tasks">
+      <a href="#start"><strong>Set up a station</strong><span class="arrow" aria-hidden="true">↗</span><small>Connect your event and printer.</small></a>
+      <a href="#selfcheck"><strong>Run a self-check</strong><span class="arrow" aria-hidden="true">↗</span><small>Verify your station before doors open.</small></a>
+      <a href="#fix"><strong>Fix a problem</strong><span class="arrow" aria-hidden="true">↗</span><small>Find the message you see on screen.</small></a>
+    </nav>
+
+    <nav class="help-nav" aria-label="Help topics">
+      <span class="help-nav-label" id="guide-label">Station guide</span>
+      <ul class="toc" aria-labelledby="guide-label">
+        <li><a href="#start" aria-current="location">Set up</a></li>
+        <li><a href="#daily">Daily use</a></li>
+        <li><a href="#layout">Badge layout</a></li>
+      </ul>
+      <span class="help-nav-label" id="support-label">Troubleshooting</span>
+      <ul class="toc" aria-labelledby="support-label">
+        <li><a href="#selfcheck">Self-check</a></li>
+        <li><a href="#fix">Fix a problem</a></li>
+        <li><a href="#investigate">Investigate</a></li>
+      </ul>
+      <span class="help-nav-label" id="reference-label">Technical details</span>
+      <ul class="toc" aria-labelledby="reference-label">
+        <li><a href="#reference">Reference</a></li>
+      </ul>
+    </nav>
+
+    <div class="help-content">
 
     <!-- ============ SET UP ============ -->
-    <section class="zone" id="start">
+    <section class="topic" id="start">
       <h2>Set up a station (first time)</h2>
-      <ol class="steps">
+      <ol class="steps" role="list">
         <li><strong>Connect and switch on the printer</strong>
           Install its driver if the computer doesn't list it already. It must appear in <em>Printers &amp; scanners</em> (Windows) or <em>Printers &amp; Scanners</em> (macOS) before PrintDex can use it. Load the label stock.</li>
         <li><strong>Open PrintDex and go to Settings → Event</strong>
@@ -129,7 +218,7 @@
     </section>
 
     <!-- ============ DAILY USE ============ -->
-    <section class="zone" id="daily">
+    <section class="topic" id="daily">
       <h2>Using it during the event</h2>
       <h3>Scanning</h3>
       <p>Keep the cursor in the <em>Ticket code</em> box (it takes focus back by itself). Point the scanner at the guest's QR code. The scanner types the code and presses Enter, and PrintDex does the rest: looks the ticket up, checks the guest in, prints the badge. You do not need to press <b>Check in &amp; print</b> when using a scanner; that button is for typing a code by hand.</p>
@@ -157,7 +246,7 @@
     </section>
 
     <!-- ============ LAYOUT ============ -->
-    <section class="zone" id="layout">
+    <section class="topic" id="layout">
       <h2>Badge layout</h2>
       <p>The badge is a stack of lines centered on the label: the guest's name, ticket type, optional details, and a QR code of the ticket. You choose what goes in the stack and in which order; PrintDex picks the text sizes.</p>
       <ul>
@@ -172,7 +261,7 @@
     </section>
 
     <!-- ============ SELF CHECK ============ -->
-    <section class="zone" id="selfcheck">
+    <section class="topic" id="selfcheck">
       <h2>Self-check</h2>
       <p>Press <b>Run checks</b> to test each part of the station in turn. Anything that fails says what to do. Run it before doors open, and again whenever something looks wrong.</p>
       <div class="check-actions">
@@ -188,7 +277,7 @@
     </section>
 
     <!-- ============ FIX A PROBLEM ============ -->
-    <section class="zone" id="fix">
+    <section class="topic" id="fix">
       <h2>Something went wrong</h2>
       <p>Find what you see on screen, open it, and follow the steps. Messages in <code>code style</code> are the exact words PrintDex shows.</p>
 
@@ -388,7 +477,7 @@
     </section>
 
     <!-- ============ INVESTIGATE ============ -->
-    <section class="zone" id="investigate">
+    <section class="topic" id="investigate">
       <h2>How to investigate</h2>
       <p>When it isn't obvious what's wrong, narrow it down by testing one part at a time:</p>
       <div class="table-wrap"><table class="simple">
@@ -415,7 +504,7 @@
     </section>
 
     <!-- ============ REFERENCE ============ -->
-    <section class="zone" id="reference">
+    <section class="topic" id="reference">
       <h2>Reference</h2>
       <h3>Settings that live outside the window</h3>
       <p>Set these as environment variables, or put them in a plain text file named <code>.env</code> in the same folder as the PrintDex program, one <code>NAME=value</code> per line. Restart PrintDex after changing them.</p>
@@ -442,6 +531,7 @@
     </section>
 
     <p class="foot">PrintDex <span id="foot-version"></span> · <a href="/">Back to station</a></p>
+    </div>
   </main>
 
 <script>
@@ -631,9 +721,27 @@
 
   // A link like /help#some-id opens that entry if it is a collapsed one.
   if (location.hash) {
-    const target = document.querySelector(location.hash);
+    const target = $(location.hash.slice(1));
     if (target && target.tagName === "DETAILS") target.open = true;
   }
+
+  const topics = Array.from(document.querySelectorAll(".help-nav a"), (link) => ({
+    link, section: $(link.hash.slice(1)),
+  })).reverse();
+  let currentTopic = topics[topics.length - 1];
+  function updateTopic() {
+    const offset = parseFloat(getComputedStyle(currentTopic.section).scrollMarginTop) + 2;
+    const atEnd = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 1;
+    const next = atEnd ? topics[0] :
+      topics.find(({ section }) => section.getBoundingClientRect().top <= offset) || topics[topics.length - 1];
+    if (next === currentTopic) return;
+    currentTopic.link.removeAttribute("aria-current");
+    next.link.setAttribute("aria-current", "location");
+    currentTopic = next;
+  }
+  window.addEventListener("scroll", updateTopic, { passive: true });
+  window.addEventListener("resize", updateTopic);
+  updateTopic();
 })();
 </script>
 </body>
