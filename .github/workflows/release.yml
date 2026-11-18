@@ -113,7 +113,9 @@ jobs:
           UPDATE_PRIVATE_KEY: ${{ secrets.UPDATE_PRIVATE_KEY }}
         run: |
           for f in dist/printdex-*; do go run . sign "$f" > "$f.sig"; done
-          (cd dist && shasum -a 256 * > "SHA256SUMS-${{ matrix.name }}.txt")
+          # Git Bash on Windows has sha256sum, macOS has shasum.
+          SUM="sha256sum"; command -v sha256sum >/dev/null || SUM="shasum -a 256"
+          (cd dist && $SUM * > "SHA256SUMS-${{ matrix.name }}.txt")
 
       - uses: actions/upload-artifact@v4
         with:
