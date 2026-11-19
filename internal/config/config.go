@@ -66,6 +66,8 @@ type Layout struct {
 	// QRStatic is what the QR prints instead of the ticket id; "{id}" inside it
 	// becomes the ticket id. Empty = the bare ticket id.
 	QRStatic string `json:"qr_static"`
+	// QRLabel is a small caption printed under the QR code. Empty = none.
+	QRLabel string `json:"qr_label"`
 }
 
 func DefaultLayout() Layout {
@@ -129,6 +131,7 @@ func (l Layout) Normalize() (Layout, error) {
 	}
 	out.VerticalOffsetMM = roundTo(clamp(l.VerticalOffsetMM, -80, 80), 1)
 	out.QRStatic = clip(strings.TrimSpace(l.QRStatic), 500)
+	out.QRLabel = clip(strings.TrimSpace(l.QRLabel), 40)
 	return out, nil
 }
 

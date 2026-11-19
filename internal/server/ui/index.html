@@ -182,6 +182,7 @@
     <div id="settings-nav" class="settings-nav" role="tablist" aria-label="Settings sections">
       <button type="button" role="tab" id="event-tab" aria-controls="event-panel" aria-selected="true" data-settings-tab="event" onclick="showSettings('event')">Event</button>
       <button type="button" role="tab" id="station-tab" aria-controls="station-panel" aria-selected="false" tabindex="-1" data-settings-tab="station" onclick="showSettings('station')">Station</button>
+      <button type="button" role="tab" id="layout-tab" aria-controls="layout-panel" aria-selected="false" tabindex="-1" data-settings-tab="layout" onclick="showSettings('layout')">Layout</button>
     </div>
     <div class="drawer-content">
       <div class="preview-slot" id="settings-preview" hidden></div>
@@ -253,7 +254,7 @@
       </section>
 
         </div>
-        <div data-settings-panel="layout" hidden>
+        <div id="layout-panel" role="tabpanel" aria-labelledby="layout-tab" data-settings-panel="layout" hidden>
       <section class="zone" aria-label="Badge layout editor">
         <p class="disclaimer">Choose what to print and drag fields to reorder them. Use <strong>Adjust</strong> to change size, weight and position.</p>
         <div class="preset-row">
@@ -283,6 +284,10 @@
           <label>QR code content
             <input id="lay-qr-static" type="text" maxlength="500" placeholder="Empty = ticket id. Or https://example.com/event, or https://x.com/t/{id}" />
             <span class="hint">Leave empty to encode the ticket id (needed for scan check-in). Use <code>{id}</code> to put the ticket id inside a link.</span>
+          </label>
+          <label>QR code label
+            <input id="lay-qr-label" type="text" maxlength="40" placeholder="e.g. Scan for schedule" />
+            <span class="hint">Small caption printed under the QR code. Leave empty for none.</span>
           </label>
           <div class="voffset-panel">
             <label class="voffset-label" for="lay-voffset">Vertical position</label>

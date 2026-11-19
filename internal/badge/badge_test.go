@@ -136,3 +136,24 @@ func TestQRDataStaticOrTicketID(t *testing.T) {
 		t.Errorf("Normalize: %q, %v", n.QRStatic, err)
 	}
 }
+
+func TestQRLabelAddsHeightAndTrims(t *testing.T) {
+	l := config.DefaultLayout()
+	plain, _, _, _ := compose(guest, l)
+	l.QRLabel = "Scan for schedule"
+	labelled, _, w, _ := compose(guest, l)
+	qr := func(bs []block) block { return bs[len(bs)-1] }
+	if qr(labelled).height() <= qr(plain).height() {
+		t.Error("label should make the QR block taller")
+	}
+	if got := fitLabel("Scan for schedule", 1000); got != "Scan for schedule" {
+		t.Errorf("fitting label changed: %q", got)
+	}
+	long := fitLabel("a very long caption that cannot possibly fit on this badge", w/4)
+	if long == "" || stringWidth(long, false, qrLabelSize) > w/4 {
+		t.Errorf("long label not trimmed to width: %q", long)
+	}
+	if n, _ := l.Normalize(); n.QRLabel != "Scan for schedule" {
+		t.Errorf("Normalize dropped label: %q", n.QRLabel)
+	}
+}

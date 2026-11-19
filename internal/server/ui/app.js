@@ -35,6 +35,11 @@
 
   // ================= Settings drawer =================
   function showSettings(section) {
+    // The layout tab widens the drawer and moves the live badge preview in.
+    const editing = section === "layout";
+    $("drawer").classList.toggle("layout-editor", editing);
+    $("settings-preview").hidden = !editing;
+    (editing ? $("settings-preview") : $("dashboard-preview")).append($("badge-preview"));
     document.querySelectorAll("[data-settings-panel]").forEach((panel) => {
       panel.hidden = panel.dataset.settingsPanel !== section;
     });
@@ -63,14 +68,8 @@
   });
 
   function openDrawer(section = "event") {
-    const editing = section === "layout";
     const drawer = $("drawer");
-    drawer.classList.toggle("layout-editor", editing);
-    $("settings-title").textContent = editing ? "Badge layout" : "Settings";
-    $("settings-nav").hidden = editing;
-    $("settings-preview").hidden = !editing;
     showSettings(section);
-    if (editing) $("settings-preview").append($("badge-preview"));
     drawer.showModal();
   }
 
@@ -93,9 +92,7 @@
   });
 
   $("drawer").addEventListener("close", () => {
-    if ($("drawer").classList.contains("layout-editor")) {
-      $("dashboard-preview").append($("badge-preview"));
-    }
+    $("dashboard-preview").append($("badge-preview"));
     if (scannerActive()) focusScan();
   });
 
@@ -396,6 +393,7 @@
       verticalOffsetMm = isFinite(vo) ? Math.min(80, Math.max(-80, vo)) : 0;
     }
     $("lay-qr-static").value = (layout && layout.qr_static) || "";
+    $("lay-qr-label").value = (layout && layout.qr_label) || "";
     _syncPreviewSize();
     _syncVoffsetUI();
     const list = $("layout-list");
@@ -459,6 +457,7 @@
     element_offsets: {},
     vertical_offset_mm: 0,
     qr_static: "",
+    qr_label: "",
   };
 
   function resetLayout() {
@@ -1107,6 +1106,7 @@
       element_offsets: elementOffsets,
       vertical_offset_mm: verticalOffsetMm,
       qr_static: $("lay-qr-static").value.trim(),
+      qr_label: $("lay-qr-label").value.trim(),
     };
     const body = { layout };
     // Editing a loaded preset keeps that preset in sync — "Save as new" is
@@ -1165,6 +1165,7 @@
       element_offsets: elementOffsets,
       vertical_offset_mm: verticalOffsetMm,
       qr_static: $("lay-qr-static").value.trim(),
+      qr_label: $("lay-qr-label").value.trim(),
     };
   }
 
@@ -1389,7 +1390,7 @@
   });
   setInterval(refresh, 15000);
 
-  ["lay-qr-static", "f-ticket", "f-name", "f-company", "f-title", "f-country", "f-table", "f-type", "f-role", "f-group", "f-group-sel"].forEach((id) => {
+  ["lay-qr-static", "lay-qr-label", "f-ticket", "f-name", "f-company", "f-title", "f-country", "f-table", "f-type", "f-role", "f-group", "f-group-sel"].forEach((id) => {
     $(id).addEventListener("input", () => schedulePreview());
   });
 

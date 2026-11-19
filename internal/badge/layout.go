@@ -26,7 +26,9 @@ const (
 	qrGap   = 0.12 * inch // around a QR code
 
 	qrNaturalSize = 1.15 * inch
-	qrMinSize     = 0.55 * inch // smaller than this stops scanning reliably
+	qrMinSize     = 0.55 * inch          // smaller than this stops scanning reliably
+	qrLabelSize   = 8.0                  // caption under a QR code
+	qrLabelDrop   = 0.75*qrLabelSize + 1 // QR bottom to caption baseline; the code's own quiet zone is the gap
 	minTextSize   = 8.0
 
 	// Growing stops when the stack fills this share of the paper height, and
@@ -66,10 +68,14 @@ type block struct {
 	lines      []string // text only
 	lineHeight float64  // text only
 	scale      float64  // the layout's size multiplier for this element
+	label      string   // QR only: caption printed under the code
 }
 
 func (b block) height() float64 {
 	if b.isQR {
+		if b.label != "" {
+			return b.size + qrLabelSize + 1
+		}
 		return b.size
 	}
 	return float64(len(b.lines)) * b.lineHeight
@@ -212,7 +218,7 @@ func measure(element string, t ticket.Ticket, l config.Layout, maxWidth float64)
 		scale = s
 	}
 	if element == "qr" {
-		return block{element: element, isQR: true, size: qrNaturalSize * scale, scale: scale}, true
+		return block{element: element, isQR: true, size: qrNaturalSize * scale, scale: scale, label: fitLabel(l.QRLabel, maxWidth)}, true
 	}
 	text := elementText(element, t)
 	if text == "" {
@@ -352,4 +358,17 @@ func compose(t ticket.Ticket, l config.Layout) (blocks []block, top, width, heig
 		top = math.Max(bottomMargin+stack, math.Min(height, top))
 	}
 	return blocks, top, width, height
+}
+
+// fitLabel trims a QR caption with an ellipsis until it fits one line.
+func fitLabel(label string, maxWidth float64) string {
+	r := []rune(label)
+	for len(r) > 0 && stringWidth(string(r), false, qrLabelSize) > maxWidth {
+		r = r[:len(r)-1]
+		label = string(r) + "…"
+		if stringWidth(label, false, qrLabelSize) <= maxWidth {
+			return label
+		}
+	}
+	return string(r)
 }

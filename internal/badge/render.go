@@ -182,7 +182,10 @@ func Render(t ticket.Ticket, l config.Layout, dpi float64) *image.Gray {
 		dx, dy := nudge.DX/25.4*inch, nudge.DY/25.4*inch
 		if b.isQR {
 			drawQR(img, qrData(t, l), ((w-b.size)/2+dx)*s, (h-y-dy)*s, b.size*s)
-			y -= b.size
+			if b.label != "" {
+				drawCentered(img, faceFor(false, qrLabelSize, dpi), (w/2+dx)*s, (h-(y-b.size-qrLabelDrop)-dy)*s, b.label)
+			}
+			y -= b.height()
 			continue
 		}
 		face := faceFor(b.bold, b.size, dpi)
