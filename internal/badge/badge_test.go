@@ -157,3 +157,23 @@ func TestQRLabelAddsHeightAndTrims(t *testing.T) {
 		t.Errorf("Normalize dropped label: %q", n.QRLabel)
 	}
 }
+
+// Without a CJK fallback every Chinese rune drew as the same .notdef box.
+func TestChineseGlyphsAreNotAllTheSameBox(t *testing.T) {
+	if fontFor(false).fallback(false) == nil || fontFor(true).fallback(true) == nil {
+		t.Fatal("embedded CJK font failed to parse")
+	}
+	draw := func(s string) []uint8 {
+		img := blank(60, 40, 203)
+		renderMu.Lock()
+		defer renderMu.Unlock()
+		drawCentered(img, faceFor(false, 20, 203), 80, 60, s)
+		return img.Pix
+	}
+	if bytes.Equal(draw("中"), draw("文")) {
+		t.Error("中 and 文 render identically: still .notdef boxes")
+	}
+	if stringWidth("中文", false, 20) < 30 {
+		t.Error("CJK width not measured from the fallback font")
+	}
+}

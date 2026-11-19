@@ -43,6 +43,9 @@ type fontSet struct {
 	upem  float64
 	adv   map[rune]float64 // advance width as a fraction of the em
 	faces map[[2]int]font.Face
+
+	fbOnce sync.Once
+	fb     *sfnt.Font // CJK fallback, see fallback.go
 }
 
 var (
@@ -78,9 +81,11 @@ func stringWidth(text string, bold bool, size float64) float64 {
 	for _, r := range text {
 		a, ok := fs.adv[r]
 		if !ok {
-			idx, _ := fs.f.GlyphIndex(&buf, r)
-			units, _ := fs.f.GlyphAdvance(&buf, idx, fixed.I(int(fs.upem)), font.HintingNone)
-			a = float64(units) / 64 / fs.upem
+			f := fs.pick(&buf, r, bold)
+			upem := float64(f.UnitsPerEm())
+			idx, _ := f.GlyphIndex(&buf, r)
+			units, _ := f.GlyphAdvance(&buf, idx, fixed.I(int(upem)), font.HintingNone)
+			a = float64(units) / 64 / upem
 			fs.adv[r] = a
 		}
 		total += a
@@ -99,7 +104,12 @@ func faceFor(bold bool, size, dpi float64) font.Face {
 	if len(fs.faces) > 256 {
 		clear(fs.faces) // ponytail: crude bound; auto-fit yields a small set of sizes in practice
 	}
-	face, _ := opentype.NewFace(fs.f, &opentype.FaceOptions{Size: size, DPI: dpi, Hinting: font.HintingNone})
+	opts := &opentype.FaceOptions{Size: size, DPI: dpi, Hinting: font.HintingNone}
+	face, _ := opentype.NewFace(fs.f, opts)
+	if fb := fs.fallback(bold); fb != nil {
+		fbFace, _ := opentype.NewFace(fb, opts)
+		face = &fallbackFace{Face: face, fb: fbFace, lib: fs.f}
+	}
 	fs.faces[key] = face
 	return face
 }
