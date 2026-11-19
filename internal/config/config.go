@@ -63,6 +63,9 @@ type Layout struct {
 	ElementBolds     map[string]bool        `json:"element_bolds"`   // weight override
 	ElementOffsets   map[string]Offset      `json:"element_offsets"` // position nudge
 	VerticalOffsetMM float64                `json:"vertical_offset_mm"`
+	// QRStatic is what the QR prints instead of the ticket id; "{id}" inside it
+	// becomes the ticket id. Empty = the bare ticket id.
+	QRStatic string `json:"qr_static"`
 }
 
 func DefaultLayout() Layout {
@@ -125,6 +128,7 @@ func (l Layout) Normalize() (Layout, error) {
 		}
 	}
 	out.VerticalOffsetMM = roundTo(clamp(l.VerticalOffsetMM, -80, 80), 1)
+	out.QRStatic = clip(strings.TrimSpace(l.QRStatic), 500)
 	return out, nil
 }
 

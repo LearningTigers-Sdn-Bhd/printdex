@@ -395,6 +395,7 @@
       const vo = parseFloat(layout.vertical_offset_mm);
       verticalOffsetMm = isFinite(vo) ? Math.min(80, Math.max(-80, vo)) : 0;
     }
+    $("lay-qr-static").value = (layout && layout.qr_static) || "";
     _syncPreviewSize();
     _syncVoffsetUI();
     const list = $("layout-list");
@@ -457,6 +458,7 @@
     element_bolds: {},
     element_offsets: {},
     vertical_offset_mm: 0,
+    qr_static: "",
   };
 
   function resetLayout() {
@@ -1104,6 +1106,7 @@
       element_bolds: elementBolds,
       element_offsets: elementOffsets,
       vertical_offset_mm: verticalOffsetMm,
+      qr_static: $("lay-qr-static").value.trim(),
     };
     const body = { layout };
     // Editing a loaded preset keeps that preset in sync — "Save as new" is
@@ -1161,6 +1164,7 @@
       element_bolds: elementBolds,
       element_offsets: elementOffsets,
       vertical_offset_mm: verticalOffsetMm,
+      qr_static: $("lay-qr-static").value.trim(),
     };
   }
 
@@ -1385,7 +1389,7 @@
   });
   setInterval(refresh, 15000);
 
-  ["f-ticket", "f-name", "f-company", "f-title", "f-country", "f-table", "f-type", "f-role", "f-group", "f-group-sel"].forEach((id) => {
+  ["lay-qr-static", "f-ticket", "f-name", "f-company", "f-title", "f-country", "f-table", "f-type", "f-role", "f-group", "f-group-sel"].forEach((id) => {
     $(id).addEventListener("input", () => schedulePreview());
   });
 

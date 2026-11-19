@@ -12,6 +12,7 @@ import (
 	"image/draw"
 	"image/png"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -155,6 +156,15 @@ func binarize(img *image.Gray) *image.Gray {
 	return img
 }
 
+// qrData is what the badge QR encodes: the layout's static text or URL
+// ("{id}" becomes the ticket id), or the bare ticket id when none is set.
+func qrData(t ticket.Ticket, l config.Layout) string {
+	if l.QRStatic == "" {
+		return t.ID
+	}
+	return strings.ReplaceAll(l.QRStatic, "{id}", t.ID)
+}
+
 // Render draws the ticket's badge at dpi as a black-and-white bitmap.
 func Render(t ticket.Ticket, l config.Layout, dpi float64) *image.Gray {
 	blocks, top, w, h := compose(t, l)
@@ -171,7 +181,7 @@ func Render(t ticket.Ticket, l config.Layout, dpi float64) *image.Gray {
 		nudge := l.ElementOffsets[b.element]
 		dx, dy := nudge.DX/25.4*inch, nudge.DY/25.4*inch
 		if b.isQR {
-			drawQR(img, t.ID, ((w-b.size)/2+dx)*s, (h-y-dy)*s, b.size*s)
+			drawQR(img, qrData(t, l), ((w-b.size)/2+dx)*s, (h-y-dy)*s, b.size*s)
 			y -= b.size
 			continue
 		}

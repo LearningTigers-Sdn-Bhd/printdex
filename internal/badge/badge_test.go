@@ -118,3 +118,21 @@ func BenchmarkRenderAndEncode(b *testing.B) {
 		PNG(Render(guest, layout, 203), 203)
 	}
 }
+
+func TestQRDataStaticOrTicketID(t *testing.T) {
+	l := config.DefaultLayout()
+	for static, want := range map[string]string{
+		"":                     "A1-0245",
+		"https://x.com/event":  "https://x.com/event",
+		"https://x.com/t/{id}": "https://x.com/t/A1-0245",
+	} {
+		l.QRStatic = static
+		if got := qrData(guest, l); got != want {
+			t.Errorf("QRStatic %q: got %q, want %q", static, got, want)
+		}
+	}
+	l.QRStatic = "  https://x.com/e  "
+	if n, err := l.Normalize(); err != nil || n.QRStatic != "https://x.com/e" {
+		t.Errorf("Normalize: %q, %v", n.QRStatic, err)
+	}
+}
